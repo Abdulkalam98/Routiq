@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import String, Enum, DateTime
+from sqlalchemy import String, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -26,8 +26,8 @@ class Customer(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    plan: Mapped[PlanType] = mapped_column(
-        Enum(PlanType, name="plan_type"), default=PlanType.FREE, nullable=False
+    plan: Mapped[str] = mapped_column(
+        String(20), default="free", nullable=False
     )
     razorpay_customer_id: Mapped[str | None] = mapped_column(
         String(255), nullable=True
