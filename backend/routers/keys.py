@@ -165,10 +165,10 @@ async def create_key(
     now = datetime.now(timezone.utc)
 
     api_key = ApiKey(
-        customer_id=user["customer_id"],
+        customer_id=customer.id,
         name=body.name,
         key_hash=key_hash,
-        prefix=prefix,
+        key_prefix=prefix,
         is_active=True,
         created_at=now,
     )
@@ -205,7 +205,7 @@ async def list_keys(
     data = [
         KeyInfo(
             id=str(k.id),
-            prefix=k.prefix,
+            prefix=k.key_prefix,
             name=k.name,
             is_active=k.is_active,
             created_at=k.created_at.isoformat() if k.created_at else "",
@@ -299,7 +299,7 @@ async def create_key_public(
         customer_id=customer.id,
         name=body.name,
         key_hash=key_hash,
-        prefix=prefix,
+        key_prefix=prefix,
         is_active=True,
         created_at=now,
     )
