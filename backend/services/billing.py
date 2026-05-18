@@ -1,4 +1,3 @@
-import razorpay
 import hmac
 import hashlib
 import logging
@@ -37,8 +36,9 @@ PLANS = {
 }
 
 
-def get_razorpay_client() -> razorpay.Client:
+def get_razorpay_client():
     """Returns a configured Razorpay client instance."""
+    import razorpay
     settings = get_settings()
     client = razorpay.Client(auth=(settings.razorpay_key_id, settings.razorpay_key_secret))
     return client
