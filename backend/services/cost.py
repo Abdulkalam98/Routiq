@@ -1,6 +1,6 @@
 """Cost calculation for LLM API usage."""
 
-from backend.config import get_settings
+from config import get_settings
 
 
 # Cost per 1K tokens in USD (before markup)
