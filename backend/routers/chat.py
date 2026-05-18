@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from middleware.auth import get_current_customer
-from middleware.rate_limit import check_rate_limit
+from middleware.ratelimit import check_rate_limit
 from services.router import get_provider, get_fallback_provider
 from services.cost import calculate_cost
 from services.usage import log_usage

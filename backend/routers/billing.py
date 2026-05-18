@@ -28,9 +28,9 @@ router = APIRouter()
 
 async def get_db() -> AsyncSession:
     """Get database session. Import the actual session factory from your db module."""
-    from database import async_session_maker
+    from database import AsyncSessionLocal
 
-    async with async_session_maker() as session:
+    async with AsyncSessionLocal() as session:
         yield session
 
 

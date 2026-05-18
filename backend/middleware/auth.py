@@ -15,14 +15,14 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from backend.database import async_session_factory
-from backend.models.customer import Customer
-from backend.models.api_key import ApiKey
+from database import AsyncSessionLocal
+from models.customer import Customer
+from models.api_key import ApiKey
 
 
 async def get_db_session() -> AsyncSession:
     """Yield an async database session."""
-    async with async_session_factory() as session:
+    async with AsyncSessionLocal() as session:
         yield session
 
 
@@ -72,7 +72,7 @@ def _verify_key(plain_key: str, key_hash: str) -> bool:
 async def _update_last_used(api_key_id: str) -> None:
     """Fire-and-forget update of last_used_at timestamp."""
     try:
-        async with async_session_factory() as session:
+        async with AsyncSessionLocal() as session:
             await session.execute(
                 update(ApiKey)
                 .where(ApiKey.id == api_key_id)

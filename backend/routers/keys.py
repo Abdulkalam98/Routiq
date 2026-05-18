@@ -16,7 +16,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
-from database import get_async_session
+from database import get_db
 
 router = APIRouter(tags=["API Keys"])
 
@@ -146,7 +146,7 @@ def _get_prefix(key: str) -> str:
 async def create_key(
     body: CreateKeyRequest,
     user: dict = Depends(get_current_user_jwt),
-    session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """
     Create a new API key for the authenticated customer.
@@ -184,7 +184,7 @@ async def create_key(
 @router.get("/keys", response_model=KeyListResponse)
 async def list_keys(
     user: dict = Depends(get_current_user_jwt),
-    session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """
     List all API keys for the authenticated customer.
@@ -216,7 +216,7 @@ async def list_keys(
 async def revoke_key(
     key_id: str,
     user: dict = Depends(get_current_user_jwt),
-    session: AsyncSession = Depends(get_async_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """
     Revoke an API key by setting is_active = False.

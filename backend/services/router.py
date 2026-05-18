@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Optional
 
-from backend.config import get_settings
+from config import get_settings
 from .providers.base import BaseLLMProvider
 from .providers.openai import OpenAIProvider
 from .providers.anthropic import AnthropicProvider
