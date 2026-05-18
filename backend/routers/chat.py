@@ -246,7 +246,7 @@ async def chat_completions(
             )
         except Exception as fallback_err:
             return _openai_error(
-                message=f"All providers failed: {str(fallback_err)}",
+                message=f"All providers failed. Primary: {str(primary_err)}. Fallback: {str(fallback_err)}",
                 error_type="server_error",
                 code="provider_error",
                 status_code=503,

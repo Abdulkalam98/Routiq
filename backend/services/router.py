@@ -123,7 +123,7 @@ def get_fallback_provider(
     Get a fallback provider when the primary provider fails.
 
     Follows the fallback chain: OpenAI -> Anthropic -> Google -> Mistral
-    Skips the provider that originally failed.
+    Skips the provider that originally failed and providers without API keys.
 
     Args:
         model_name: The model name that failed (used to determine which provider to skip).
@@ -131,14 +131,23 @@ def get_fallback_provider(
     Returns:
         Tuple of (provider_instance, fallback_model_name) or None if no fallback available.
     """
+    settings = get_settings()
+    api_keys = {
+        "openai": settings.openai_api_key,
+        "anthropic": settings.anthropic_api_key,
+        "google": settings.google_api_key,
+        "mistral": settings.mistral_api_key,
+    }
+
     try:
         failed_provider = get_provider_name(model_name)
     except ValueError:
-        # Unknown model, try Google as fallback
-        return _get_google_provider(), "gemini-flash"
+        failed_provider = None
 
     for provider_name in FALLBACK_CHAIN:
         if provider_name == failed_provider:
+            continue
+        if not api_keys.get(provider_name):
             continue
 
         getter = PROVIDER_GETTERS[provider_name]
