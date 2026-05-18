@@ -11,104 +11,49 @@ import {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-const initialKeys = [
-  {
-    id: 1,
-    prefix: 'rq_live_a3f2',
-    name: 'Production App',
-    last_used: '2 minutes ago',
-    status: 'active',
-    created: '2024-01-15',
-  },
-  {
-    id: 2,
-    prefix: 'rq_live_b7d1',
-    name: 'Staging Environment',
-    last_used: '3 hours ago',
-    status: 'active',
-    created: '2024-02-20',
-  },
-  {
-    id: 3,
-    prefix: 'rq_test_c9e4',
-    name: 'Local Development',
-    last_used: '1 day ago',
-    status: 'active',
-    created: '2024-03-01',
-  },
-  {
-    id: 4,
-    prefix: 'rq_live_d2f8',
-    name: 'Old Integration',
-    last_used: '30 days ago',
-    status: 'revoked',
-    created: '2023-11-10',
-  },
-];
+const initialKeys = [];
 
 export default function Keys() {
   const [keys, setKeys] = useState(initialKeys);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showRevokeModal, setShowRevokeModal] = useState(null);
   const [newKeyName, setNewKeyName] = useState('');
+  const [newKeyEmail, setNewKeyEmail] = useState('');
   const [createdKey, setCreatedKey] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState('');
 
   const handleCreateKey = async () => {
-    if (!newKeyName.trim()) return;
+    if (!newKeyName.trim() || !newKeyEmail.trim()) return;
+    setError('');
 
     try {
-      const res = await fetch(`${API_BASE}/api/keys`, {
+      const res = await fetch(`${API_BASE}/api/v1/keys/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newKeyName }),
+        body: JSON.stringify({ name: newKeyName, email: newKeyEmail }),
       });
 
+      const data = await res.json();
+
       if (res.ok) {
-        const data = await res.json();
         setCreatedKey(data.key);
         setKeys((prev) => [
           {
-            id: Date.now(),
-            prefix: data.key.substring(0, 12),
+            id: data.id,
+            prefix: data.prefix,
             name: newKeyName,
             last_used: 'Never',
             status: 'active',
-            created: new Date().toISOString().split('T')[0],
+            created: data.created_at,
           },
-          ...prev,
+          ...prev.filter((k) => k.id !== 1 && k.id !== 2 && k.id !== 3 && k.id !== 4),
         ]);
       } else {
-        // Simulate key creation for demo
-        const fakeKey = `rq_live_${Math.random().toString(36).substring(2, 6)}_${Math.random().toString(36).substring(2, 34)}`;
-        setCreatedKey(fakeKey);
-        setKeys((prev) => [
-          {
-            id: Date.now(),
-            prefix: fakeKey.substring(0, 12),
-            name: newKeyName,
-            last_used: 'Never',
-            status: 'active',
-            created: new Date().toISOString().split('T')[0],
-          },
-          ...prev,
-        ]);
+        setError(data?.detail?.error?.message || data?.error?.message || 'Failed to create key');
       }
     } catch (err) {
-      // Simulate key creation for demo
-      const fakeKey = `rq_live_${Math.random().toString(36).substring(2, 6)}_${Math.random().toString(36).substring(2, 34)}`;
-      setCreatedKey(fakeKey);
-      setKeys((prev) => [
-        {
-          id: Date.now(),
-          prefix: fakeKey.substring(0, 12),
-          name: newKeyName,
-          last_used: 'Never',
-          status: 'active',
-          created: new Date().toISOString().split('T')[0],
-        },
-        ...prev,
-      ]);
+      setError('Network error. Please try again.');
     }
 
     setNewKeyName('');
@@ -248,21 +193,40 @@ export default function Keys() {
 
             {!createdKey ? (
               <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Key Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newKeyName}
-                    onChange={(e) => setNewKeyName(e.target.value)}
-                    placeholder="e.g., Production App"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleCreateKey();
-                    }}
-                  />
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={newKeyEmail}
+                      onChange={(e) => setNewKeyEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Key Name
+                    </label>
+                    <input
+                      type="text"
+                      value={newKeyName}
+                      onChange={(e) => setNewKeyName(e.target.value)}
+                      placeholder="e.g., Production App"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleCreateKey();
+                      }}
+                    />
+                  </div>
                 </div>
+                {error && (
+                  <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">
+                    {error}
+                  </div>
+                )}
                 <div className="mt-6 flex gap-3 justify-end">
                   <button
                     onClick={() => setShowCreateModal(false)}
@@ -272,7 +236,7 @@ export default function Keys() {
                   </button>
                   <button
                     onClick={handleCreateKey}
-                    disabled={!newKeyName.trim()}
+                    disabled={!newKeyName.trim() || !newKeyEmail.trim()}
                     className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Create Key

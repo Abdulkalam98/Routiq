@@ -30,6 +30,11 @@ class CreateKeyRequest(BaseModel):
     name: str
 
 
+class CreateKeyPublicRequest(BaseModel):
+    name: str
+    email: str
+
+
 class CreateKeyResponse(BaseModel):
     id: str
     key: str  # Full key returned ONCE at creation
@@ -253,4 +258,60 @@ async def revoke_key(
             "object": "api_key",
             "deleted": True,
         }
+    )
+
+
+@router.post("/keys/create", response_model=CreateKeyResponse)
+async def create_key_public(
+    body: CreateKeyPublicRequest,
+    session: AsyncSession = Depends(get_db),
+):
+    """
+    Create a new API key using email lookup (no JWT required).
+    The full key is returned ONCE in this response.
+    """
+    from models.api_key import ApiKey
+    from models.customer import Customer
+
+    result = await session.execute(
+        select(Customer).where(Customer.email == body.email)
+    )
+    customer = result.scalar_one_or_none()
+
+    if customer is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": {
+                    "message": f"No customer found with email: {body.email}",
+                    "type": "invalid_request_error",
+                    "code": "customer_not_found",
+                }
+            },
+        )
+
+    raw_key = _generate_api_key()
+    key_hash = _hash_key(raw_key)
+    prefix = _get_prefix(raw_key)
+    now = datetime.now(timezone.utc)
+
+    api_key = ApiKey(
+        customer_id=customer.id,
+        name=body.name,
+        key_hash=key_hash,
+        prefix=prefix,
+        is_active=True,
+        created_at=now,
+    )
+
+    session.add(api_key)
+    await session.commit()
+    await session.refresh(api_key)
+
+    return CreateKeyResponse(
+        id=str(api_key.id),
+        key=raw_key,
+        name=api_key.name,
+        prefix=prefix,
+        created_at=now.isoformat(),
     )
