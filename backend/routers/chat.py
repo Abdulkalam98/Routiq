@@ -89,6 +89,7 @@ def _openai_error(message: str, error_type: str, code: str, status_code: int = 4
 
 async def _build_streaming_response(
     provider,
+    resolved_model: str,
     request_body: ChatCompletionRequest,
     completion_id: str,
     customer,
@@ -103,7 +104,7 @@ async def _build_streaming_response(
 
     try:
         async for chunk in provider.stream_chat_completion(
-            model=request_body.model,
+            model=resolved_model,
             messages=request_body.messages,
             temperature=request_body.temperature,
             max_tokens=request_body.max_tokens,
@@ -193,7 +194,7 @@ async def chat_completions(
 
     # Resolve provider for requested model
     try:
-        provider = get_provider(request_body.model)
+        provider, resolved_model = get_provider(request_body.model)
     except ValueError as e:
         return _openai_error(
             message=str(e),
@@ -208,6 +209,7 @@ async def chat_completions(
             return StreamingResponse(
                 _build_streaming_response(
                     provider=provider,
+                    resolved_model=resolved_model,
                     request_body=request_body,
                     completion_id=completion_id,
                     customer=customer,
@@ -221,17 +223,19 @@ async def chat_completions(
             )
         except Exception:
             # Try fallback provider for streaming
-            fallback = get_fallback_provider(request_body.model)
-            if fallback is None:
+            fallback_result = get_fallback_provider(request_body.model)
+            if fallback_result is None:
                 return _openai_error(
                     message="Provider temporarily unavailable.",
                     error_type="server_error",
                     code="provider_error",
                     status_code=503,
                 )
+            fallback_provider, fallback_model = fallback_result
             return StreamingResponse(
                 _build_streaming_response(
-                    provider=fallback,
+                    provider=fallback_provider,
+                    resolved_model=fallback_model,
                     request_body=request_body,
                     completion_id=completion_id,
                     customer=customer,
@@ -247,7 +251,7 @@ async def chat_completions(
     # --- Non-streaming response ---
     try:
         result = await provider.chat_completion(
-            model=request_body.model,
+            model=resolved_model,
             messages=request_body.messages,
             temperature=request_body.temperature,
             max_tokens=request_body.max_tokens,
@@ -258,17 +262,18 @@ async def chat_completions(
         )
     except Exception as primary_err:
         # Attempt fallback provider
-        fallback = get_fallback_provider(request_body.model)
-        if fallback is None:
+        fallback_result = get_fallback_provider(request_body.model)
+        if fallback_result is None:
             return _openai_error(
                 message=f"Provider error: {str(primary_err)}",
                 error_type="server_error",
                 code="provider_error",
                 status_code=503,
             )
+        fallback_provider, fallback_model = fallback_result
         try:
-            result = await fallback.chat_completion(
-                model=request_body.model,
+            result = await fallback_provider.chat_completion(
+                model=fallback_model,
                 messages=request_body.messages,
                 temperature=request_body.temperature,
                 max_tokens=request_body.max_tokens,
