@@ -1,0 +1,55 @@
+# Full local development stack (no cloud services needed)
+services:
+  routiq-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: routiq-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://routiq:routiq_secret@routiq-db:5432/routiq
+      REDIS_URL: redis://routiq-cache:6379/0
+    depends_on:
+      routiq-db:
+        condition: service_healthy
+      routiq-cache:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+
+  routiq-db:
+    image: postgres:16-alpine
+    container_name: routiq-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: routiq
+      POSTGRES_PASSWORD: routiq_secret
+      POSTGRES_DB: routiq
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U routiq"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  routiq-cache:
+    image: redis:7-alpine
+    container_name: routiq-cache
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

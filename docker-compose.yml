@@ -1,0 +1,30 @@
+# Local development with cloud services
+# For full local setup, use docker-compose.local.yml
+services:
+  routiq-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: routiq-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+
+  # Optional: local PostgreSQL if you don't want to use Supabase
+  # routiq-db:
+  #   image: postgres:16-alpine
+  #   ports:
+  #     - "5432:5432"
+  #   environment:
+  #     POSTGRES_USER: routiq
+  #     POSTGRES_PASSWORD: routiq_secret
+  #     POSTGRES_DB: routiq
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+
+# volumes:
+#   postgres_data:
