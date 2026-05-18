@@ -7,7 +7,7 @@ import time
 import uuid
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -96,14 +96,14 @@ async def _build_streaming_response(
 ) -> AsyncGenerator[str, None]:
     """
     Yield SSE-formatted chunks from the provider's streaming response.
+    The provider already yields properly formatted SSE strings.
     After the stream ends, log usage asynchronously.
     """
     prompt_tokens = 0
     completion_tokens = 0
-    full_content = ""
 
     try:
-        async for chunk in provider.stream_chat_completion(
+        async for sse_chunk in provider.chat_completion_stream(
             model=resolved_model,
             messages=request_body.messages,
             temperature=request_body.temperature,
@@ -113,41 +113,10 @@ async def _build_streaming_response(
             presence_penalty=request_body.presence_penalty,
             stop=request_body.stop,
         ):
-            # Each chunk is expected to be a dict with delta content and optional usage
-            delta_content = chunk.get("content", "")
-            finish_reason = chunk.get("finish_reason")
+            yield sse_chunk
 
-            if chunk.get("usage"):
-                prompt_tokens = chunk["usage"].get("prompt_tokens", 0)
-                completion_tokens = chunk["usage"].get("completion_tokens", 0)
-
-            if delta_content:
-                full_content += delta_content
-                completion_tokens = max(
-                    completion_tokens, len(full_content) // 4
-                )  # Rough token estimate if not provided
-
-            sse_data = {
-                "id": completion_id,
-                "object": "chat.completion.chunk",
-                "created": int(time.time()),
-                "model": request_body.model,
-                "choices": [
-                    {
-                        "index": 0,
-                        "delta": {"content": delta_content} if delta_content else {},
-                        "finish_reason": finish_reason,
-                    }
-                ],
-            }
-
-            yield f"data: {_json_dumps(sse_data)}\n\n"
-
-            if finish_reason:
-                break
-
-        # Final [DONE] marker per OpenAI spec
-        yield "data: [DONE]\n\n"
+            # Rough token estimate from streamed content length
+            completion_tokens += 1
 
     finally:
         # Log usage asynchronously after stream completes
@@ -165,13 +134,6 @@ async def _build_streaming_response(
                 completion_id=completion_id,
             )
         )
-
-
-def _json_dumps(obj: dict) -> str:
-    """Fast JSON serialization."""
-    import json
-
-    return json.dumps(obj, separators=(",", ":"))
 
 
 # ---------------------------------------------------------------------------
@@ -290,12 +252,15 @@ async def chat_completions(
                 status_code=503,
             )
 
-    # Extract response data from provider result
-    content = result.get("content", "")
-    prompt_tokens = result.get("prompt_tokens", 0)
-    completion_tokens = result.get("completion_tokens", 0)
-    total_tokens = prompt_tokens + completion_tokens
-    finish_reason = result.get("finish_reason", "stop")
+    # Extract response data from provider result (OpenAI nested format)
+    choices = result.get("choices", [])
+    choice = choices[0] if choices else {}
+    content = choice.get("message", {}).get("content", "")
+    finish_reason = choice.get("finish_reason", "stop")
+    usage_data = result.get("usage", {})
+    prompt_tokens = usage_data.get("prompt_tokens", 0)
+    completion_tokens = usage_data.get("completion_tokens", 0)
+    total_tokens = usage_data.get("total_tokens", prompt_tokens + completion_tokens)
     model_used = result.get("model", request_body.model)
 
     # Build OpenAI-format response
