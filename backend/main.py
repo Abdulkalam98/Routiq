@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import traceback
 
 from config import get_settings
-from routers import chat, models, keys, billing, auth
+from routers import chat, models, keys, billing, auth, playground
 
 
 @asynccontextmanager
@@ -55,6 +55,7 @@ app.include_router(models.router, prefix="/v1")
 app.include_router(keys.router, prefix="/v1")
 app.include_router(billing.router)
 app.include_router(auth.router, prefix="/v1")
+app.include_router(playground.router, prefix="/v1")
 
 
 @app.get("/health")

@@ -4,6 +4,7 @@ import {
   ChartBarIcon,
   KeyIcon,
   CreditCardIcon,
+  ChatBubbleLeftRightIcon,
   ArrowLeftOnRectangleIcon,
   Bars3Icon,
   XMarkIcon,
@@ -13,6 +14,7 @@ import { getToken, logout } from '../lib/auth';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: ChartBarIcon },
+  { name: 'Playground', href: '/playground', icon: ChatBubbleLeftRightIcon },
   { name: 'API Keys', href: '/keys', icon: KeyIcon },
   { name: 'Billing', href: '/billing', icon: CreditCardIcon },
 ];
