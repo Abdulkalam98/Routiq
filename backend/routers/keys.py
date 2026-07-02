@@ -165,7 +165,7 @@ async def create_key(
     now = datetime.now(timezone.utc)
 
     api_key = ApiKey(
-        customer_id=customer.id,
+        customer_id=user["customer_id"],
         name=body.name,
         key_hash=key_hash,
         key_prefix=prefix,
