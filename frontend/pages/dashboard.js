@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Layout from '../components/Layout';
+import { useAuth } from '../lib/auth';
 import {
   CurrencyRupeeIcon,
   BoltIcon,
@@ -16,7 +17,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = '';
 
 const dummyStats = {
   total_spend_today: 42.5,
@@ -56,6 +57,8 @@ const dummyRequests = [
 ];
 
 export default function Dashboard() {
+  useAuth();
+
   const [stats, setStats] = useState(dummyStats);
   const [costByModel, setCostByModel] = useState(dummyCostByModel);
   const [requests, setRequests] = useState(dummyRequests);

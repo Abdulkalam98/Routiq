@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Layout from '../components/Layout';
+import { useAuth, getToken } from '../lib/auth';
 import {
   KeyIcon,
   ClipboardDocumentIcon,
@@ -14,24 +15,56 @@ const API_BASE = '';
 const initialKeys = [];
 
 export default function Keys() {
+  const user = useAuth();
+
   const [keys, setKeys] = useState(initialKeys);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showRevokeModal, setShowRevokeModal] = useState(null);
   const [newKeyName, setNewKeyName] = useState('');
-  const [newKeyEmail, setNewKeyEmail] = useState('');
   const [createdKey, setCreatedKey] = useState(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    const token = getToken();
+    if (!token) return;
+
+    fetch(`${API_BASE}/api/v1/keys`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.data) {
+          setKeys(
+            data.data.map((k) => ({
+              id: k.id,
+              prefix: k.prefix,
+              name: k.name,
+              last_used: k.last_used_at || 'Never',
+              status: k.is_active ? 'active' : 'revoked',
+              created: k.created_at,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const handleCreateKey = async () => {
-    if (!newKeyName.trim() || !newKeyEmail.trim()) return;
+    if (!newKeyName.trim()) return;
     setError('');
 
+    const token = getToken();
+    if (!token) return;
+
     try {
-      const res = await fetch(`${API_BASE}/api/v1/keys/create`, {
+      const res = await fetch(`${API_BASE}/api/v1/keys`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newKeyName, email: newKeyEmail }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: newKeyName }),
       });
 
       const data = await res.json();
@@ -47,12 +80,12 @@ export default function Keys() {
             status: 'active',
             created: data.created_at,
           },
-          ...prev.filter((k) => k.id !== 1 && k.id !== 2 && k.id !== 3 && k.id !== 4),
+          ...prev,
         ]);
       } else {
         setError(data?.detail?.error?.message || data?.error?.message || 'Failed to create key');
       }
-    } catch (err) {
+    } catch {
       setError('Network error. Please try again.');
     }
 
@@ -60,10 +93,14 @@ export default function Keys() {
   };
 
   const handleRevokeKey = async (keyId) => {
-    try {
-      await fetch(`${API_BASE}/api/keys/${keyId}/revoke`, { method: 'POST' });
-    } catch (err) {
-      // Continue with local state update
+    const token = getToken();
+    if (token) {
+      try {
+        await fetch(`${API_BASE}/api/v1/keys/${keyId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+      } catch {}
     }
 
     setKeys((prev) =>
@@ -196,18 +233,6 @@ export default function Keys() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={newKeyEmail}
-                      onChange={(e) => setNewKeyEmail(e.target.value)}
-                      placeholder="your@email.com"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Key Name
                     </label>
                     <input
@@ -236,7 +261,7 @@ export default function Keys() {
                   </button>
                   <button
                     onClick={handleCreateKey}
-                    disabled={!newKeyName.trim() || !newKeyEmail.trim()}
+                    disabled={!newKeyName.trim()}
                     className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Create Key

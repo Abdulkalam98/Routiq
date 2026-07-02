@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Head from 'next/head';
 import Layout from '../components/Layout';
 import Link from 'next/link';
+import { useAuth } from '../lib/auth';
 import {
   CheckCircleIcon,
   ArrowUpIcon,
@@ -36,6 +37,8 @@ const paymentHistory = [
 ];
 
 export default function Billing() {
+  useAuth();
+
   const [currentPlan] = useState('Starter');
   const [usage] = useState({ used: 32450, limit: 50000 });
 
