@@ -43,7 +43,7 @@ export function useAuth() {
       return;
     }
     setUser({ customer_id: decoded.sub, email: decoded.email });
-  }, [router]);
+  }, [router, logout]);
 
   return user;
 }
