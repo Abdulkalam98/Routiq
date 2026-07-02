@@ -8,13 +8,45 @@ import {
   Bars3Icon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getToken, logout } from '../lib/auth';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: ChartBarIcon },
   { name: 'API Keys', href: '/keys', icon: KeyIcon },
   { name: 'Billing', href: '/billing', icon: CreditCardIcon },
 ];
+
+function TopBarUser() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+
+  useEffect(() => {
+    const token = getToken();
+    if (!token) return;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      setEmail(payload.email || '');
+    } catch {}
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
+  };
+
+  return (
+    <div className="flex items-center gap-4">
+      {email && <span className="text-sm text-gray-500">{email}</span>}
+      <button
+        onClick={handleLogout}
+        className="text-sm text-gray-500 hover:text-gray-700 font-medium"
+      >
+        Logout
+      </button>
+    </div>
+  );
+}
 
 export default function Layout({ children }) {
   const router = useRouter();
@@ -59,12 +91,7 @@ export default function Layout({ children }) {
 
             <div className="flex-1" />
 
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-500">dev@example.com</span>
-              <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-                <span className="text-sm font-medium text-primary-700">D</span>
-              </div>
-            </div>
+            <TopBarUser />
           </div>
         </div>
 
