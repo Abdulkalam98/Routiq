@@ -104,6 +104,8 @@ routiq/
 11. `gemini-2.0-flash` quota exhausted → switched to `gemini-2.5-flash`
 12. ApiKey `prefix` field → `key_prefix`
 13. Frontend `API_BASE` localhost → relative URL for Vercel rewrites
+14. `plan` column PostgreSQL enum → converted to VARCHAR(20): `ALTER TABLE customers ALTER COLUMN plan TYPE VARCHAR(20) USING plan::VARCHAR`
+15. `create_key` used undefined `customer.id` → changed to `user["customer_id"]`
 
 ## Development Commands
 ```bash
