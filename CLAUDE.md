@@ -20,12 +20,16 @@
 - Customer UUID: `ea0ad5aa-d5bc-495e-b58f-e73d886424ec`
 
 ## Key Endpoints
-- `POST /v1/chat/completions` — OpenAI-compatible (requires API key auth)
+- `POST /v1/chat/completions` — OpenAI-compatible (requires API key auth, supports `model: "auto"`)
 - `POST /v1/keys/create` — Create API key with `{name, email}` (no JWT)
 - `POST /v1/keys` — Create API key (requires JWT auth)
 - `GET /v1/keys` — List keys (requires JWT auth)
 - `DELETE /v1/keys/{id}` — Revoke key (requires JWT auth)
 - `GET /v1/models` — List available models
+- `POST /v1/playground/chat` — Playground chat (JWT auth, supports smart routing + caching)
+- `GET /v1/dashboard/stats` — Today's spend/requests + month total (JWT auth)
+- `GET /v1/dashboard/cost-by-model` — Cost breakdown by model (JWT auth)
+- `GET /v1/dashboard/requests` — Recent request logs (JWT auth)
 - `GET /health` — Health check
 
 ## Key Architecture Decisions
@@ -37,6 +41,9 @@
 - Automatic provider fallback chain: OpenAI → Anthropic → Google → Mistral (skips unconfigured)
 - All costs in INR only, 5% markup on token costs, USD_TO_INR = 84.0
 - Frontend uses relative URLs (`API_BASE = ''`) — Vercel rewrites `/api/:path*` to Render
+- Smart auto-routing: `model: "auto"` → rule-based complexity classifier → cheapest adequate model
+- Exact-match caching: SHA-256(model+messages) → Upstash Redis, 1hr TTL, fails open
+- Cache uses only 2 Redis commands per request (GET + optional SET)
 
 ## Project Structure
 ```
@@ -45,12 +52,12 @@ routiq/
 │   ├── main.py       # App entry, router registration
 │   ├── config.py     # Pydantic settings
 │   ├── database.py   # Async SQLAlchemy + Supabase pooler
-│   ├── routers/      # chat, models, keys, billing
+│   ├── routers/      # chat, models, keys, billing, playground, dashboard, auth
 │   ├── middleware/    # auth (API key), ratelimit (Upstash)
-│   ├── services/     # providers/, router, cost, billing, usage
+│   ├── services/     # providers/, router, smart_router, cost, billing, usage, cache
 │   └── models/       # customer, api_key, usage_log, payment
 ├── frontend/         # Next.js 14
-│   ├── pages/        # index, dashboard, keys, billing
+│   ├── pages/        # index, dashboard, keys, billing, playground
 │   ├── components/   # Layout, Navbar
 │   └── vercel.json   # Rewrites /api/* → Render
 └── CLAUDE.md         # This file
@@ -58,6 +65,7 @@ routiq/
 
 ## Critical Patterns
 - `get_provider()` returns `tuple[BaseLLMProvider, str]` — always unpack
+- `get_provider_smart(messages)` returns `tuple[BaseLLMProvider, str, str]` — (provider, resolved_model, actual_model)
 - Provider `chat_completion()` returns nested OpenAI format (choices/usage)
 - Streaming method is `chat_completion_stream()` (not `stream_chat_completion`)
 - Razorpay must be lazy-imported (pkg_resources issue on Render)
@@ -66,6 +74,10 @@ routiq/
 - ApiKey model field is `key_prefix` (not `prefix`)
 - Google model map: `gemini-flash` → `gemini-2.5-flash`
 - Python version pinned to 3.12.3 (Render defaults to 3.14 which breaks pydantic)
+- Smart routing: simple→gemini-flash, medium→gpt-4o-mini, complex→gpt-4o (zero LLM calls)
+- Cache key: `cache:` + SHA-256(model+messages)[:32], TTL 3600s
+- Cache fails open — Redis errors never block the main request
+- Dashboard endpoints return zeros (not errors) when no usage data exists
 
 ## Environment Variables (Render)
 - `DATABASE_URL` — Supabase Session Pooler (`postgresql+asyncpg://...`)
@@ -84,6 +96,21 @@ routiq/
 - claude-sonnet-4-6, claude-haiku (Anthropic)
 - gemini-1.5-pro, gemini-flash (Google — routes to gemini-2.5-flash)
 - mistral-large, mistral-small (Mistral)
+- `auto` — Smart routing (picks cheapest model based on prompt complexity)
+
+## Smart Routing (model: "auto")
+- Rule-based classifier — zero LLM calls, zero cost
+- Simple (≤15 words, greetings, short factual) → `gemini-flash`
+- Medium (moderate length, single complexity signal) → `gpt-4o-mini`
+- Complex (2+ complexity keywords, code blocks, multi-question) → `gpt-4o`
+
+## Caching
+- Exact-match only (SHA-256 of model + messages)
+- Stored in Upstash Redis, 1hr TTL
+- Non-streaming requests only
+- Returns 0 tokens / ₹0 cost on cache hit
+- Response header: `X-Routiq-Cached: true`
+- Playground shows "⚡ Cached (saved!)" badge
 
 ## Git Profile
 - GitHub account: Abdulkalam98
@@ -129,4 +156,6 @@ curl -X POST https://routiq-api.onrender.com/v1/keys/create \
 
 ## Notes
 - Project built 2026-05-18
+- Token savings features added 2026-07-02 (dashboard, presets, smart routing, caching)
 - No tests written yet — add pytest + jest when ready
+- Playground presets: Summarizer, Translator, Code Helper, Explainer, Grammar Fixer (frontend-only)
