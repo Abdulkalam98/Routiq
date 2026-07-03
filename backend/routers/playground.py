@@ -5,6 +5,7 @@ Supports smart auto-routing and response caching.
 """
 
 import asyncio
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
@@ -20,6 +21,10 @@ from services.cache import get_cached_response, set_cached_response
 from services.semantic_cache import find_similar_cached, store_semantic_cache
 from services.context_window import trim_messages, get_tokens_saved
 from services.summarizer import summarize_turns, build_summary_message
+from middleware.prompt_guard import check_prompt_injection, format_block_response
+from services.pii_redactor import redact_messages
+
+logger = logging.getLogger("routiq.playground")
 
 router = APIRouter(prefix="/playground", tags=["Playground"])
 
@@ -63,6 +68,28 @@ async def playground_chat(
     """
     # Convert messages to list of dicts for the provider
     messages = [{"role": m.role, "content": m.content} for m in body.messages]
+
+    # --- Security checks (injection + PII, no token budget for playground) ---
+
+    # Prompt injection detection
+    injection_result = check_prompt_injection(messages)
+    if injection_result.action == "block":
+        logger.warning(
+            "Playground injection blocked | score=%d patterns=%s",
+            injection_result.score,
+            injection_result.matched_patterns,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=format_block_response(injection_result),
+        )
+
+    # PII redaction
+    redacted_messages, pii_report = redact_messages(messages)
+    if pii_report.total > 0:
+        messages = redacted_messages
+
+    # --- End security checks ---
 
     # Resolve provider (smart routing for "auto")
     try:

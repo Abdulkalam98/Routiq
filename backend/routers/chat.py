@@ -3,16 +3,20 @@ Chat completions router - OpenAI-compatible POST /chat/completions
 """
 
 import asyncio
+import logging
 import time
 import uuid
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from middleware.auth import get_current_customer
 from middleware.ratelimit import check_rate_limit
+from middleware.token_budget import check_token_budget, increment_token_budget
+from middleware.prompt_guard import check_prompt_injection, format_block_response
+from services.pii_redactor import redact_messages
 from services.router import get_provider, get_provider_smart, get_fallback_provider
 from services.cost import calculate_cost
 from services.usage import log_usage
@@ -20,6 +24,8 @@ from services.cache import get_cached_response, set_cached_response
 from services.semantic_cache import find_similar_cached, store_semantic_cache
 from services.context_window import trim_messages, get_tokens_saved
 from services.summarizer import summarize_turns, build_summary_message
+
+logger = logging.getLogger("routiq.chat")
 
 router = APIRouter(tags=["Chat"])
 
@@ -97,6 +103,7 @@ async def _build_streaming_response(
     request_body: ChatCompletionRequest,
     completion_id: str,
     customer,
+    api_key_id: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """
     Yield SSE-formatted chunks from the provider's streaming response.
@@ -138,6 +145,11 @@ async def _build_streaming_response(
                 completion_id=completion_id,
             )
         )
+        # Increment token budget for streaming responses
+        if api_key_id:
+            asyncio.create_task(
+                increment_token_budget(api_key_id, prompt_tokens + completion_tokens)
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -147,6 +159,7 @@ async def _build_streaming_response(
 
 @router.post("/chat/completions")
 async def chat_completions(
+    request: Request,
     request_body: ChatCompletionRequest,
     customer=Depends(get_current_customer),
     _rate_limit=Depends(check_rate_limit),
@@ -157,6 +170,31 @@ async def chat_completions(
     """
     completion_id = _generate_completion_id()
     created = int(time.time())
+
+    # --- Security checks (order: budget → injection → PII) ---
+
+    # 1. Token budget check (raises 429 if exceeded)
+    await check_token_budget(request, customer)
+
+    # 2. Prompt injection detection (runs on raw messages)
+    injection_result = check_prompt_injection(request_body.messages)
+    if injection_result.action == "block":
+        logger.warning(
+            "Prompt injection blocked | score=%d patterns=%s",
+            injection_result.score,
+            injection_result.matched_patterns,
+        )
+        return JSONResponse(
+            status_code=400,
+            content=format_block_response(injection_result),
+        )
+
+    # 3. PII redaction (clean messages before any caching or provider call)
+    redacted_messages, pii_report = redact_messages(request_body.messages)
+    if pii_report.total > 0:
+        request_body.messages = redacted_messages
+
+    # --- End security checks ---
 
     # Resolve provider for requested model
     try:
@@ -177,6 +215,7 @@ async def chat_completions(
 
     # --- Streaming response ---
     if request_body.stream:
+        stream_api_key_id = getattr(request.state, "api_key_id", None)
         try:
             return StreamingResponse(
                 _build_streaming_response(
@@ -185,6 +224,7 @@ async def chat_completions(
                     request_body=request_body,
                     completion_id=completion_id,
                     customer=customer,
+                    api_key_id=stream_api_key_id,
                 ),
                 media_type="text/event-stream",
                 headers={
@@ -211,6 +251,7 @@ async def chat_completions(
                     request_body=request_body,
                     completion_id=completion_id,
                     customer=customer,
+                    api_key_id=stream_api_key_id,
                 ),
                 media_type="text/event-stream",
                 headers={
@@ -386,9 +427,18 @@ async def chat_completions(
         store_semantic_cache(request_body.messages, actual_model, content)
     )
 
-    # Add tokens-saved header if context was trimmed
+    # Increment token budget counter (async, fire-and-forget)
+    api_key_id = getattr(request.state, "api_key_id", None)
+    if api_key_id:
+        asyncio.create_task(increment_token_budget(api_key_id, total_tokens))
+
+    # Build response headers (tokens saved + security headers)
     headers = {}
     if tokens_saved > 0:
         headers["X-Routiq-Tokens-Saved"] = str(tokens_saved)
+    if pii_report.total > 0:
+        headers["X-Routiq-PII-Redacted"] = str(pii_report.total)
+    if injection_result.action == "warn":
+        headers["X-Routiq-Injection-Risk"] = "medium"
 
     return JSONResponse(content=response.model_dump(), headers=headers) if headers else response

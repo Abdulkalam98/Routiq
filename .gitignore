@@ -102,3 +102,4 @@ docker-compose.override.yml
 *.orig
 .terraform/
 terraform.tfstate*
+.superpowers/

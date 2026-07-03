@@ -141,4 +141,4 @@ User types message → hits Enter
 - Saving/exporting conversation history
 - System prompt configuration
 - Temperature / max_tokens controls
-- Usage counting against plan limits enforcement (logged but not blocked in playground — same as chat endpoint)
+- Usage counting against plan limits enforcement (playground requests DO count toward monthly token limits, same as API calls — no special treatment)

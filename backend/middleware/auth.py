@@ -126,6 +126,8 @@ async def get_current_customer(
         if _verify_key(plain_key, api_key.key_hash):
             # Found a valid key — fire-and-forget the last_used_at update
             asyncio.create_task(_update_last_used(api_key.id))
+            # Store key ID for downstream middleware (token budget, audit)
+            request.state.api_key_id = str(api_key.id)
             return api_key.customer
 
     # No matching key found

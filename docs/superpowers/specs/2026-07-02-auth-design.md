@@ -80,6 +80,7 @@ Add `password_hash VARCHAR(255)` (nullable) to the existing `customers` table.
 **`frontend/pages/keys.js`**
 - Replace hardcoded `dev@routiq.io` email flow with `Authorization: Bearer <token>` header
 - Use `getToken()` from `lib/auth.js`
+- If `getToken()` returns null, redirect to `/login`
 
 **`frontend/pages/dashboard.js`** and **`frontend/pages/billing.js`**
 - Add `useAuth()` at the top to protect the page
