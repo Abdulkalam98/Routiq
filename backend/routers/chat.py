@@ -17,6 +17,9 @@ from services.router import get_provider, get_provider_smart, get_fallback_provi
 from services.cost import calculate_cost
 from services.usage import log_usage
 from services.cache import get_cached_response, set_cached_response
+from services.semantic_cache import find_similar_cached, store_semantic_cache
+from services.context_window import trim_messages, get_tokens_saved
+from services.summarizer import summarize_turns, build_summary_message
 
 router = APIRouter(tags=["Chat"])
 
@@ -240,10 +243,52 @@ async def chat_completions(
             headers={"X-Routiq-Cached": "true"},
         )
 
+    # Semantic cache check (if exact match missed)
+    semantic_hit = await find_similar_cached(request_body.messages, actual_model)
+    if semantic_hit:
+        return JSONResponse(
+            content={
+                "id": completion_id,
+                "object": "chat.completion",
+                "created": created,
+                "model": semantic_hit.get("model", actual_model),
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": semantic_hit["content"]},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+            },
+            headers={
+                "X-Routiq-Cached": "true",
+                "X-Routiq-Cache-Type": "semantic",
+            },
+        )
+
+    # Context window trimming + summarization
+    messages_to_send = request_body.messages
+    tokens_saved = 0
+    trimmed_messages, was_trimmed, dropped = trim_messages(request_body.messages)
+    if was_trimmed:
+        tokens_saved = get_tokens_saved(request_body.messages, trimmed_messages)
+        # Summarize dropped messages (async but we need the result)
+        summary = await summarize_turns(dropped)
+        if summary:
+            summary_msg = build_summary_message(summary)
+            # Insert summary after system message (or at start)
+            if trimmed_messages and trimmed_messages[0].get("role") == "system":
+                messages_to_send = [trimmed_messages[0], summary_msg] + trimmed_messages[1:]
+            else:
+                messages_to_send = [summary_msg] + trimmed_messages
+        else:
+            messages_to_send = trimmed_messages
+
     try:
         result = await provider.chat_completion(
             model=resolved_model,
-            messages=request_body.messages,
+            messages=messages_to_send,
             temperature=request_body.temperature,
             max_tokens=request_body.max_tokens,
             top_p=request_body.top_p,
@@ -265,7 +310,7 @@ async def chat_completions(
         try:
             result = await fallback_provider.chat_completion(
                 model=fallback_model,
-                messages=request_body.messages,
+                messages=messages_to_send,
                 temperature=request_body.temperature,
                 max_tokens=request_body.max_tokens,
                 top_p=request_body.top_p,
@@ -336,4 +381,14 @@ async def chat_completions(
         })
     )
 
-    return response
+    # Store in semantic cache for future similar requests
+    asyncio.create_task(
+        store_semantic_cache(request_body.messages, actual_model, content)
+    )
+
+    # Add tokens-saved header if context was trimmed
+    headers = {}
+    if tokens_saved > 0:
+        headers["X-Routiq-Tokens-Saved"] = str(tokens_saved)
+
+    return JSONResponse(content=response.model_dump(), headers=headers) if headers else response

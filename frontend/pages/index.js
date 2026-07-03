@@ -3,9 +3,10 @@ import Link from 'next/link';
 import Navbar from '../components/Navbar';
 import {
   BoltIcon,
-  CurrencyRupeeIcon,
+  CpuChipIcon,
   ArrowPathIcon,
   CheckIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 
 const plans = [
@@ -59,21 +60,27 @@ const plans = [
 const valueProps = [
   {
     icon: BoltIcon,
-    title: '4 providers. 1 API key.',
+    title: 'Smart Routing',
     description:
-      'OpenAI, Anthropic, Google, Mistral — all through a single unified endpoint. No more juggling SDKs.',
+      'Auto-picks the cheapest model for your prompt. Simple questions use cheap models, complex ones get GPT-4o. Zero wasted tokens.',
   },
   {
-    icon: CurrencyRupeeIcon,
-    title: 'Pay in ₹ via UPI',
+    icon: SparklesIcon,
+    title: 'Semantic Caching',
     description:
-      'No international card needed. Pay directly in Indian Rupees using UPI, netbanking, or cards.',
+      'Similar prompts return cached responses instantly — zero tokens, zero cost. Not just exact matches, but meaning-based similarity.',
+  },
+  {
+    icon: CpuChipIcon,
+    title: 'Context Compression',
+    description:
+      'Long conversations auto-trimmed and summarized. Cuts 50-80% of tokens while preserving full context.',
   },
   {
     icon: ArrowPathIcon,
-    title: 'Switch in 30 seconds',
+    title: '4 Providers. 1 API Key.',
     description:
-      'Change your base_url and API key. That\'s it. Your existing OpenAI SDK code works instantly.',
+      'OpenAI, Anthropic, Google, Mistral — switch your base_url and you\'re done. Existing OpenAI SDK code works instantly.',
   },
 ];
 
@@ -81,10 +88,10 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Routiq - One API. Every AI Model. Pay in ₹.</title>
+        <title>Routiq - One API. Every AI Model. Save 60% on Tokens.</title>
         <meta
           name="description"
-          content="Route smarter. Build faster. Access OpenAI, Anthropic, Google, and Mistral through one API. Pay in Indian Rupees."
+          content="Route smarter. Build faster. Access OpenAI, Anthropic, Google, and Mistral through one API with smart routing, semantic caching, and context compression."
         />
         <link rel="icon" href="/favicon.ico" />
       </Head>
@@ -101,7 +108,7 @@ export default function Home() {
               <span className="text-red-500">Build faster.</span>
             </h1>
             <p className="mt-6 text-xl sm:text-2xl text-gray-300 max-w-2xl mx-auto">
-              One API. Every AI Model. Pay in ₹.
+              One API. Every AI Model. Save 60% on tokens.
             </p>
 
             {/* Code Block */}
@@ -163,7 +170,7 @@ export default function Home() {
         {/* Value Props */}
         <section className="py-20 bg-dark-800/50">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               {valueProps.map((prop) => (
                 <div
                   key={prop.title}
@@ -252,7 +259,7 @@ export default function Home() {
         <footer className="py-12 border-t border-dark-600">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <p className="text-gray-400 text-sm">
-              Built for Indian developers.
+              Route smarter. Build faster.
             </p>
             <p className="mt-2 text-gray-500 text-xs">
               &copy; {new Date().getFullYear()} Routiq. All rights reserved.

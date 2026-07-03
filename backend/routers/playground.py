@@ -17,6 +17,9 @@ from services.router import get_provider, get_provider_smart
 from services.cost import calculate_cost
 from services.usage import log_usage
 from services.cache import get_cached_response, set_cached_response
+from services.semantic_cache import find_similar_cached, store_semantic_cache
+from services.context_window import trim_messages, get_tokens_saved
+from services.summarizer import summarize_turns, build_summary_message
 
 router = APIRouter(prefix="/playground", tags=["Playground"])
 
@@ -43,6 +46,8 @@ class PlaygroundChatResponse(BaseModel):
     usage: UsageInfo
     cost_inr: float
     cached: bool = False
+    cache_type: str | None = None  # "exact" or "semantic"
+    tokens_saved: int = 0
 
 
 @router.post("/chat", response_model=PlaygroundChatResponse)
@@ -87,13 +92,42 @@ async def playground_chat(
             usage=UsageInfo(prompt_tokens=0, completion_tokens=0, total_tokens=0),
             cost_inr=0.0,
             cached=True,
+            cache_type="exact",
         )
+
+    # Semantic cache check
+    semantic_hit = await find_similar_cached(messages, actual_model)
+    if semantic_hit:
+        return PlaygroundChatResponse(
+            content=semantic_hit["content"],
+            model=semantic_hit.get("model", actual_model),
+            usage=UsageInfo(prompt_tokens=0, completion_tokens=0, total_tokens=0),
+            cost_inr=0.0,
+            cached=True,
+            cache_type="semantic",
+        )
+
+    # Context window trimming + summarization
+    messages_to_send = messages
+    tokens_saved = 0
+    trimmed_messages, was_trimmed, dropped = trim_messages(messages)
+    if was_trimmed:
+        tokens_saved = get_tokens_saved(messages, trimmed_messages)
+        summary = await summarize_turns(dropped)
+        if summary:
+            summary_msg = build_summary_message(summary)
+            if trimmed_messages and trimmed_messages[0].get("role") == "system":
+                messages_to_send = [trimmed_messages[0], summary_msg] + trimmed_messages[1:]
+            else:
+                messages_to_send = [summary_msg] + trimmed_messages
+        else:
+            messages_to_send = trimmed_messages
 
     # Call provider
     try:
         result = await provider.chat_completion(
             model=resolved_model,
-            messages=messages,
+            messages=messages_to_send,
         )
     except Exception as e:
         raise HTTPException(
@@ -131,6 +165,11 @@ async def playground_chat(
         })
     )
 
+    # Store in semantic cache for similar requests
+    asyncio.create_task(
+        store_semantic_cache(messages, actual_model, content)
+    )
+
     # Log usage asynchronously
     asyncio.create_task(
         log_usage(
@@ -153,4 +192,5 @@ async def playground_chat(
         ),
         cost_inr=round(cost_inr, 4),
         cached=False,
+        tokens_saved=tokens_saved,
     )
