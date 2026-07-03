@@ -48,6 +48,7 @@
 - Context windowing: auto-trim to 6K tokens, keep system prompt + last 4 turns
 - Conversation summarization: gemini-flash compresses dropped messages → inject as system context
 - All token-reduction features fail open — errors never block the request
+- Security pipeline: token budget → prompt injection → PII redaction (all before provider call)
 
 ## Project Structure
 ```
@@ -57,7 +58,7 @@ routiq/
 │   ├── config.py     # Pydantic settings
 │   ├── database.py   # Async SQLAlchemy + Supabase pooler
 │   ├── routers/      # chat, models, keys, billing, playground, dashboard, auth
-│   ├── middleware/    # auth (API key), ratelimit (Upstash)
+│   ├── middleware/    # auth (API key), ratelimit (Upstash), token_budget, prompt_guard
 │   ├── services/
 │   │   ├── providers/       # openai, anthropic, google, mistral
 │   │   ├── router.py        # Model → provider routing
@@ -66,6 +67,7 @@ routiq/
 │   │   ├── semantic_cache.py # Embedding-based similarity cache
 │   │   ├── context_window.py # Token trimming + message windowing
 │   │   ├── summarizer.py    # Conversation summarization via gemini-flash
+│   │   ├── pii_redactor.py  # PII detection & redaction (regex)
 │   │   ├── cost.py          # Token cost calculation
 │   │   ├── usage.py         # Async usage logging
 │   │   └── billing.py       # Razorpay integration
@@ -94,8 +96,12 @@ routiq/
 - Semantic cache: `scache:{0-499}` rotating buffer, `scache:idx` counter
 - Context window: `trim_messages()` returns `(trimmed, was_trimmed, dropped)`
 - Summarizer uses Google AI Studio endpoint directly (no extra dependency)
-- All fail-open: cache/embedding/summarizer errors never block the request
+- All fail-open: cache/embedding/summarizer/security errors never block the request
 - Dashboard endpoints return zeros (not errors) when no usage data exists
+- Auth middleware stores `request.state.api_key_id` for downstream security checks
+- Token budget key: `budget:{api_key_id}:daily`, TTL resets at midnight UTC
+- Prompt guard: score-based (high=+2, medium=+1), block≥3, warn≥1
+- PII redactor: only scans user-role messages, system prompts left intact
 
 ## Environment Variables (Render)
 - `DATABASE_URL` — Supabase Session Pooler (`postgresql+asyncpg://...`)
@@ -153,6 +159,44 @@ Exact cache → Semantic cache → Context trim + summarize → Provider call �
 - **Response header**: `X-Routiq-Tokens-Saved: N`
 - **Fail-open**: If summarization fails, uses trimmed messages without summary
 
+## Security Pipeline (`middleware/token_budget.py`, `middleware/prompt_guard.py`, `services/pii_redactor.py`)
+
+### Request Flow (order matters)
+```
+Auth → Rate Limit → Token Budget → Prompt Injection → PII Redaction → Cache → Provider
+```
+
+### Token Budget (`middleware/token_budget.py`)
+- Daily token limits per API key (resets midnight UTC via Redis TTL)
+- Tiers: free=50K/day, starter=200K/day, pro=1M/day
+- Redis key: `budget:{api_key_id}:daily` → integer (INCRBY after response)
+- Pre-check: GET, compare to limit → 429 `token_budget_exceeded`
+- Post-increment: INCRBY + EXPIRE pipeline (async, fire-and-forget)
+- Fails open if Redis unavailable
+
+### Prompt Injection Guard (`middleware/prompt_guard.py`)
+- Score-based weighted pattern matching (compiled regex, <1ms)
+- High patterns (+2): "ignore previous instructions", "jailbreak", DAN mode, system prompt extraction
+- Medium patterns (+1): "pretend you are", "without restrictions", "developer mode"
+- Score ≥ 3 → BLOCK (400 `prompt_injection_detected`)
+- Score 1-2 → WARN (allow, header `X-Routiq-Injection-Risk: medium`)
+- Score 0 → PASS (clean)
+- Only scans user-role messages, never logs actual prompt content
+
+### PII Redaction (`services/pii_redactor.py`)
+- Regex-based detection of: email, phone, credit card, SSN, Aadhaar, IPv4
+- Replaces with: `[REDACTED_EMAIL]`, `[REDACTED_PHONE]`, `[REDACTED_CARD]`, etc.
+- Only scans user-role messages (system prompts left intact)
+- Response header: `X-Routiq-PII-Redacted: N` (count, never actual values)
+- Runs BEFORE caching (so cached responses are already clean)
+
+### Security Design Principles
+- **All fail-open**: Redis down / regex error → request proceeds normally
+- **No new dependencies**: pure regex + existing Upstash REST client
+- **Never logs PII**: only pattern names and counts in logs
+- **OpenAI-compatible errors**: `{error: {message, type, code}}` format
+- **Async increments**: budget tracking never blocks the response
+
 ## Git Profile
 - GitHub account: Abdulkalam98
 - Other account: Abdul0898 (may be default active)
@@ -203,6 +247,7 @@ curl -X POST https://routiq-api.onrender.com/v1/keys/create \
 - Docs page added 2026-07-03 (sidebar nav, endpoint badges, code blocks with copy)
 - Token reduction features added 2026-07-03 (semantic caching, context window, summarization)
 - Landing page updated 2026-07-03 (removed India-specific copy, added token-saving feature cards)
+- Security features added 2026-07-03 (token budget per key, PII redaction, prompt injection detection)
 - Navbar links: Docs → /docs, Pricing → #pricing, Playground → /playground, Dashboard → /dashboard
 - No tests written yet — add pytest + jest when ready
 - Playground presets: Summarizer, Translator, Code Helper, Explainer, Grammar Fixer (frontend-only)
