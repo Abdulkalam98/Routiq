@@ -57,7 +57,7 @@ routiq/
 │   ├── services/     # providers/, router, smart_router, cost, billing, usage, cache
 │   └── models/       # customer, api_key, usage_log, payment
 ├── frontend/         # Next.js 14
-│   ├── pages/        # index, dashboard, keys, billing, playground
+│   ├── pages/        # index, docs, dashboard, keys, billing, playground, login, signup
 │   ├── components/   # Layout, Navbar
 │   └── vercel.json   # Rewrites /api/* → Render
 └── CLAUDE.md         # This file
@@ -72,6 +72,7 @@ routiq/
 - Plan field is `String(20)` not Enum (Supabase stores lowercase)
 - All imports use flat paths (`from config import ...` not `from backend.config`)
 - ApiKey model field is `key_prefix` (not `prefix`)
+- API key prefix stored as `key[:10]`, auth lookup must also use `key[:10]` (not 8!)
 - Google model map: `gemini-flash` → `gemini-2.5-flash`
 - Python version pinned to 3.12.3 (Render defaults to 3.14 which breaks pydantic)
 - Smart routing: simple→gemini-flash, medium→gpt-4o-mini, complex→gpt-4o (zero LLM calls)
@@ -133,6 +134,7 @@ routiq/
 13. Frontend `API_BASE` localhost → relative URL for Vercel rewrites
 14. `plan` column PostgreSQL enum → converted to VARCHAR(20): `ALTER TABLE customers ALTER COLUMN plan TYPE VARCHAR(20) USING plan::VARCHAR`
 15. `create_key` used undefined `customer.id` → changed to `user["customer_id"]`
+16. API key auth prefix mismatch: creation stored `key[:10]` but auth searched `key[:8]` → aligned both to `key[:10]`
 
 ## Development Commands
 ```bash
@@ -157,5 +159,16 @@ curl -X POST https://routiq-api.onrender.com/v1/keys/create \
 ## Notes
 - Project built 2026-05-18
 - Token savings features added 2026-07-02 (dashboard, presets, smart routing, caching)
+- Dark/red theme applied 2026-07-03 (all pages: landing, docs, dashboard, playground, keys, billing, login, signup)
+- Docs page added 2026-07-03 (full API docs with Quick Start, Models, Smart Routing, Caching, Rate Limits)
+- Navbar links: Docs → /docs, Pricing → #pricing, Playground → /playground, Dashboard → /dashboard
 - No tests written yet — add pytest + jest when ready
 - Playground presets: Summarizer, Translator, Code Helper, Explainer, Grammar Fixer (frontend-only)
+
+## UI Theme
+- **Global**: Dark theme (`bg-dark-900`) with red accent (`red-600` buttons, `red-400` text highlights)
+- **Layout**: All authenticated pages use dark sidebar/topbar (isDark = true always)
+- **Tailwind dark colors**: `dark-900` (#0a0a0f), `dark-800` (#111118), `dark-700` (#1a1a24), `dark-600` (#2a2a3a)
+- **Dashboard cards**: Use `.dashboard-card` class (defined in globals.css)
+- **Accent pattern**: Red for CTAs/active states, green for success badges, amber for warnings
+- **Logo**: Red square with white "R" (`bg-red-600`)
