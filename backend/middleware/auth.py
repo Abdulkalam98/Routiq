@@ -96,9 +96,10 @@ async def get_current_customer(
     """
     plain_key = _extract_api_key(request)
 
-    # The key_prefix is the first 8 characters (e.g., "rq_abc12")
+    # The key_prefix is the first 10 characters (e.g., "rq_abc12xy")
     # used to narrow the database search before doing bcrypt verification
-    key_prefix = plain_key[:8]
+    # Must match _get_prefix() in routers/keys.py which stores key[:10]
+    key_prefix = plain_key[:10]
 
     # Look up candidate keys by prefix
     result = await session.execute(
