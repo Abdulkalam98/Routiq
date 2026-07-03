@@ -1,7 +1,7 @@
 # Routiq — Project Memory
 
 ## Overview
-- **What**: AI API Gateway for Indian developers (OpenRouter clone for India)
+- **What**: AI API Gateway — route to multiple LLM providers, save 60% on tokens
 - **Website**: https://routiqai.vercel.app
 - **API**: https://routiq-api.onrender.com
 - **Repo**: https://github.com/Abdulkalam98/Routiq
@@ -12,6 +12,7 @@
 - **Frontend**: Next.js 14 + Tailwind CSS (deployed on Vercel free tier)
 - **Database**: Supabase PostgreSQL (Session Pooler, port 5432, IPv4)
 - **Cache/Rate Limit**: Upstash Redis (REST API, 10K commands/day free)
+- **Embeddings**: Google `text-embedding-004` (via AI Studio, free)
 - **LLM**: Google AI Studio — `gemini-2.5-flash`
 - **Payments**: Razorpay (UPI, net banking, Indian cards — INR only)
 
@@ -43,7 +44,10 @@
 - Frontend uses relative URLs (`API_BASE = ''`) — Vercel rewrites `/api/:path*` to Render
 - Smart auto-routing: `model: "auto"` → rule-based complexity classifier → cheapest adequate model
 - Exact-match caching: SHA-256(model+messages) → Upstash Redis, 1hr TTL, fails open
-- Cache uses only 2 Redis commands per request (GET + optional SET)
+- Semantic caching: Google text-embedding-004 → cosine similarity > 0.92 → cache hit
+- Context windowing: auto-trim to 6K tokens, keep system prompt + last 4 turns
+- Conversation summarization: gemini-flash compresses dropped messages → inject as system context
+- All token-reduction features fail open — errors never block the request
 
 ## Project Structure
 ```
@@ -54,7 +58,17 @@ routiq/
 │   ├── database.py   # Async SQLAlchemy + Supabase pooler
 │   ├── routers/      # chat, models, keys, billing, playground, dashboard, auth
 │   ├── middleware/    # auth (API key), ratelimit (Upstash)
-│   ├── services/     # providers/, router, smart_router, cost, billing, usage, cache
+│   ├── services/
+│   │   ├── providers/       # openai, anthropic, google, mistral
+│   │   ├── router.py        # Model → provider routing
+│   │   ├── smart_router.py  # Prompt complexity classifier
+│   │   ├── cache.py         # Exact-match Redis cache
+│   │   ├── semantic_cache.py # Embedding-based similarity cache
+│   │   ├── context_window.py # Token trimming + message windowing
+│   │   ├── summarizer.py    # Conversation summarization via gemini-flash
+│   │   ├── cost.py          # Token cost calculation
+│   │   ├── usage.py         # Async usage logging
+│   │   └── billing.py       # Razorpay integration
 │   └── models/       # customer, api_key, usage_log, payment
 ├── frontend/         # Next.js 14
 │   ├── pages/        # index, docs, dashboard, keys, billing, playground, login, signup
@@ -77,7 +91,10 @@ routiq/
 - Python version pinned to 3.12.3 (Render defaults to 3.14 which breaks pydantic)
 - Smart routing: simple→gemini-flash, medium→gpt-4o-mini, complex→gpt-4o (zero LLM calls)
 - Cache key: `cache:` + SHA-256(model+messages)[:32], TTL 3600s
-- Cache fails open — Redis errors never block the main request
+- Semantic cache: `scache:{0-499}` rotating buffer, `scache:idx` counter
+- Context window: `trim_messages()` returns `(trimmed, was_trimmed, dropped)`
+- Summarizer uses Google AI Studio endpoint directly (no extra dependency)
+- All fail-open: cache/embedding/summarizer errors never block the request
 - Dashboard endpoints return zeros (not errors) when no usage data exists
 
 ## Environment Variables (Render)
@@ -105,13 +122,36 @@ routiq/
 - Medium (moderate length, single complexity signal) → `gpt-4o-mini`
 - Complex (2+ complexity keywords, code blocks, multi-question) → `gpt-4o`
 
-## Caching
-- Exact-match only (SHA-256 of model + messages)
+## Caching (Two Layers)
+
+### Exact-Match Cache (`services/cache.py`)
+- SHA-256 of model + messages → Redis key
 - Stored in Upstash Redis, 1hr TTL
 - Non-streaming requests only
 - Returns 0 tokens / ₹0 cost on cache hit
 - Response header: `X-Routiq-Cached: true`
-- Playground shows "⚡ Cached (saved!)" badge
+
+### Semantic Cache (`services/semantic_cache.py`)
+- Embeds last user message via Google `text-embedding-004`
+- Stores in rotating Redis buffer (500 entries, 2hr TTL)
+- Cosine similarity > 0.92 = cache hit
+- Scans last 50 entries via pipeline (single Redis call)
+- Response header: `X-Routiq-Cache-Type: semantic`
+- "What is Python?" ≈ "Explain Python to me" → same cached response
+
+### Request Flow (non-streaming)
+```
+Exact cache → Semantic cache → Context trim + summarize → Provider call → Store both caches
+```
+
+## Context Compression (`services/context_window.py` + `services/summarizer.py`)
+- **Token estimation**: 4 chars ≈ 1 token (no tiktoken dependency)
+- **Context window**: 6,000 tokens max — keeps system prompt + last 4 turns
+- **Summarization trigger**: When dropped messages > 500 estimated tokens
+- **Summarizer**: Calls gemini-flash with max 150 output tokens (~100 word summary)
+- **Injection**: Summary prepended as system message: "Previous conversation context: ..."
+- **Response header**: `X-Routiq-Tokens-Saved: N`
+- **Fail-open**: If summarization fails, uses trimmed messages without summary
 
 ## Git Profile
 - GitHub account: Abdulkalam98
@@ -158,12 +198,15 @@ curl -X POST https://routiq-api.onrender.com/v1/keys/create \
 
 ## Notes
 - Project built 2026-05-18
-- Token savings features added 2026-07-02 (dashboard, presets, smart routing, caching)
+- Token savings features added 2026-07-02 (dashboard, presets, smart routing, exact-match caching)
 - Dark/red theme applied 2026-07-03 (all pages: landing, docs, dashboard, playground, keys, billing, login, signup)
-- Docs page added 2026-07-03 (full API docs with Quick Start, Models, Smart Routing, Caching, Rate Limits)
+- Docs page added 2026-07-03 (sidebar nav, endpoint badges, code blocks with copy)
+- Token reduction features added 2026-07-03 (semantic caching, context window, summarization)
+- Landing page updated 2026-07-03 (removed India-specific copy, added token-saving feature cards)
 - Navbar links: Docs → /docs, Pricing → #pricing, Playground → /playground, Dashboard → /dashboard
 - No tests written yet — add pytest + jest when ready
 - Playground presets: Summarizer, Translator, Code Helper, Explainer, Grammar Fixer (frontend-only)
+- Docs page uses IntersectionObserver for scroll-aware sidebar highlighting
 
 ## UI Theme
 - **Global**: Dark theme (`bg-dark-900`) with red accent (`red-600` buttons, `red-400` text highlights)
