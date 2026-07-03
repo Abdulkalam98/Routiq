@@ -81,7 +81,7 @@ def get_provider(model_name: str) -> tuple[BaseLLMProvider, str]:
         ValueError: If the model name cannot be routed to any provider.
     """
     if model_name == "auto":
-        # Default to cheapest option: Google Gemini Flash
+        # Default fallback for auto (smart routing handles this separately)
         return _get_google_provider(), "gemini-flash"
 
     if model_name.startswith("gpt-"):
@@ -99,6 +99,20 @@ def get_provider(model_name: str) -> tuple[BaseLLMProvider, str]:
     raise ValueError(
         f"Unknown model '{model_name}'. Supported prefixes: gpt-*, claude-*, gemini-*, mistral-*, or 'auto'."
     )
+
+
+def get_provider_smart(messages: list[dict]) -> tuple[BaseLLMProvider, str, str]:
+    """
+    Smart routing: analyze messages and pick the cheapest adequate model.
+
+    Returns:
+        Tuple of (provider_instance, resolved_model_for_provider, actual_model_name_for_cost)
+    """
+    from services.smart_router import smart_route
+
+    selected_model = smart_route(messages)
+    provider, resolved = get_provider(selected_model)
+    return provider, resolved, selected_model
 
 
 def get_provider_name(model_name: str) -> str:

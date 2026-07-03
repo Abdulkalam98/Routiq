@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Layout from '../components/Layout';
-import { useAuth } from '../lib/auth';
+import { useAuth, getToken } from '../lib/auth';
 import {
   CurrencyRupeeIcon,
   BoltIcon,
@@ -66,10 +66,12 @@ export default function Dashboard() {
   useEffect(() => {
     async function fetchData() {
       try {
+        const token = getToken();
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
         const [statsRes, costRes, requestsRes] = await Promise.all([
-          fetch(`${API_BASE}/api/dashboard/stats`),
-          fetch(`${API_BASE}/api/dashboard/cost-by-model`),
-          fetch(`${API_BASE}/api/dashboard/requests?limit=20`),
+          fetch(`${API_BASE}/api/v1/dashboard/stats`, { headers }),
+          fetch(`${API_BASE}/api/v1/dashboard/cost-by-model`, { headers }),
+          fetch(`${API_BASE}/api/v1/dashboard/requests?limit=20`, { headers }),
         ]);
 
         if (statsRes.ok) {

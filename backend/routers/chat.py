@@ -13,9 +13,10 @@ from pydantic import BaseModel
 
 from middleware.auth import get_current_customer
 from middleware.ratelimit import check_rate_limit
-from services.router import get_provider, get_fallback_provider
+from services.router import get_provider, get_provider_smart, get_fallback_provider
 from services.cost import calculate_cost
 from services.usage import log_usage
+from services.cache import get_cached_response, set_cached_response
 
 router = APIRouter(tags=["Chat"])
 
@@ -156,7 +157,13 @@ async def chat_completions(
 
     # Resolve provider for requested model
     try:
-        provider, resolved_model = get_provider(request_body.model)
+        if request_body.model == "auto":
+            provider, resolved_model, actual_model = get_provider_smart(
+                request_body.messages
+            )
+        else:
+            provider, resolved_model = get_provider(request_body.model)
+            actual_model = request_body.model
     except ValueError as e:
         return _openai_error(
             message=str(e),
@@ -211,6 +218,28 @@ async def chat_completions(
             )
 
     # --- Non-streaming response ---
+
+    # Check cache first (only for non-streaming)
+    cached = await get_cached_response(actual_model, request_body.messages)
+    if cached:
+        return JSONResponse(
+            content={
+                "id": completion_id,
+                "object": "chat.completion",
+                "created": created,
+                "model": cached.get("model", actual_model),
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": cached["content"]},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+            },
+            headers={"X-Routiq-Cached": "true"},
+        )
+
     try:
         result = await provider.chat_completion(
             model=resolved_model,
@@ -285,18 +314,26 @@ async def chat_completions(
 
     # Log usage asynchronously - never block the response
     cost_usd, cost_inr = calculate_cost(
-        request_body.model, prompt_tokens, completion_tokens
+        actual_model, prompt_tokens, completion_tokens
     )
     asyncio.create_task(
         log_usage(
             customer_id=customer.id,
-            model=request_body.model,
+            model=actual_model,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             cost_usd=cost_usd,
             cost_inr=cost_inr,
             completion_id=completion_id,
         )
+    )
+
+    # Cache the response for future identical requests
+    asyncio.create_task(
+        set_cached_response(actual_model, request_body.messages, {
+            "content": content,
+            "model": model_used,
+        })
     )
 
     return response

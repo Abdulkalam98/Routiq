@@ -7,6 +7,7 @@ import { PaperAirplaneIcon, TrashIcon } from '@heroicons/react/24/outline';
 const API_BASE = '';
 
 const MODELS = [
+  { id: 'auto', name: 'Auto (Smart)', provider: 'Routiq' },
   { id: 'gemini-flash', name: 'Gemini Flash', provider: 'Google' },
   { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI' },
   { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'OpenAI' },
@@ -16,10 +17,20 @@ const MODELS = [
   { id: 'mistral-small', name: 'Mistral Small', provider: 'Mistral' },
 ];
 
+const PRESETS = [
+  { id: 'none', name: 'No Preset', prompt: '' },
+  { id: 'summarizer', name: 'Summarizer', prompt: 'You are a concise summarizer. Respond with bullet points only.' },
+  { id: 'translator', name: 'Translator', prompt: "Translate the user's text to English. If already English, translate to Hindi." },
+  { id: 'code-helper', name: 'Code Helper', prompt: 'You are a coding assistant. Give concise code examples with comments. No fluff.' },
+  { id: 'explainer', name: 'Explainer', prompt: "Explain like I'm 5. Use simple language and analogies." },
+  { id: 'grammar-fixer', name: 'Grammar Fixer', prompt: "Fix the grammar and spelling in the user's text. Return only the corrected version." },
+];
+
 export default function Playground() {
   useAuth();
 
-  const [model, setModel] = useState('gemini-flash');
+  const [model, setModel] = useState('auto');
+  const [preset, setPreset] = useState('none');
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -47,6 +58,12 @@ export default function Playground() {
     setInput('');
     setLoading(true);
 
+    // Build messages to send (prepend system preset if active)
+    const activePreset = PRESETS.find((p) => p.id === preset);
+    const messagesToSend = activePreset && activePreset.prompt
+      ? [{ role: 'system', content: activePreset.prompt }, ...updatedMessages.map((m) => ({ role: m.role, content: m.content }))]
+      : updatedMessages.map((m) => ({ role: m.role, content: m.content }));
+
     try {
       const res = await fetch(`${API_BASE}/api/v1/playground/chat`, {
         method: 'POST',
@@ -56,7 +73,7 @@ export default function Playground() {
         },
         body: JSON.stringify({
           model,
-          messages: updatedMessages.map((m) => ({ role: m.role, content: m.content })),
+          messages: messagesToSend,
         }),
       });
 
@@ -70,6 +87,7 @@ export default function Playground() {
             tokens: data.usage.total_tokens,
             cost_inr: data.cost_inr,
             model: data.model,
+            cached: data.cached || false,
           },
         ]);
       } else {
@@ -124,6 +142,17 @@ export default function Playground() {
                 </option>
               ))}
             </select>
+            <select
+              value={preset}
+              onChange={(e) => setPreset(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+            >
+              {PRESETS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
             <button
               onClick={handleClear}
               className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -133,6 +162,15 @@ export default function Playground() {
             </button>
           </div>
         </div>
+
+        {/* Active preset badge */}
+        {preset !== 'none' && (
+          <div className="mb-2">
+            <span className="inline-flex items-center px-3 py-1 bg-primary-50 text-primary-700 rounded-full text-xs font-medium">
+              🎯 Preset: {PRESETS.find((p) => p.id === preset)?.name}
+            </span>
+          </div>
+        )}
 
         {/* Messages area */}
         <div className="flex-1 overflow-y-auto border border-gray-200 rounded-xl bg-white p-4 space-y-4">
@@ -159,7 +197,10 @@ export default function Playground() {
                 <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                 {msg.role === 'assistant' && msg.tokens != null && (
                   <p className="mt-1 text-xs text-gray-500">
+                    {msg.cached && <span className="text-amber-600 font-medium mr-1">⚡ Cached</span>}
                     {msg.tokens} tokens · ₹{msg.cost_inr.toFixed(4)}
+                    {msg.cached && <span className="ml-1 text-green-600">(saved!)</span>}
+                    {msg.model && <span className="ml-2 text-gray-400">via {msg.model}</span>}
                   </p>
                 )}
               </div>
