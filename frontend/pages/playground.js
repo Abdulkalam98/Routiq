@@ -128,13 +128,13 @@ export default function Playground() {
 
       <div className="flex flex-col h-[calc(100vh-10rem)]">
         {/* Top bar */}
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-gray-900">Playground</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h1 className="text-2xl font-bold text-white">Playground</h1>
           <div className="flex items-center gap-3">
             <select
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="bg-dark-700 border border-dark-600 text-gray-300 text-sm rounded-lg px-3 py-2 focus:ring-red-500 focus:border-red-500 outline-none"
             >
               {MODELS.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -145,7 +145,7 @@ export default function Playground() {
             <select
               value={preset}
               onChange={(e) => setPreset(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className="bg-dark-700 border border-dark-600 text-gray-300 text-sm rounded-lg px-3 py-2 focus:ring-red-500 focus:border-red-500 outline-none"
             >
               {PRESETS.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -155,7 +155,7 @@ export default function Playground() {
             </select>
             <button
               onClick={handleClear}
-              className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-1 px-3 py-2 text-sm text-gray-400 hover:text-white border border-dark-600 rounded-lg hover:bg-dark-700 transition-colors"
             >
               <TrashIcon className="w-4 h-4" />
               Clear
@@ -166,16 +166,16 @@ export default function Playground() {
         {/* Active preset badge */}
         {preset !== 'none' && (
           <div className="mb-2">
-            <span className="inline-flex items-center px-3 py-1 bg-primary-50 text-primary-700 rounded-full text-xs font-medium">
+            <span className="inline-flex items-center px-3 py-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded-full text-xs font-medium">
               🎯 Preset: {PRESETS.find((p) => p.id === preset)?.name}
             </span>
           </div>
         )}
 
         {/* Messages area */}
-        <div className="flex-1 overflow-y-auto border border-gray-200 rounded-xl bg-white p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto border border-dark-600 rounded-xl bg-dark-800 p-4 space-y-4">
           {messages.length === 0 && (
-            <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+            <div className="flex items-center justify-center h-full text-gray-500 text-sm">
               Send a message to start testing
             </div>
           )}
@@ -188,19 +188,19 @@ export default function Playground() {
               <div
                 className={`max-w-[75%] rounded-xl px-4 py-3 ${
                   msg.role === 'user'
-                    ? 'bg-primary-500 text-white'
+                    ? 'bg-red-600 text-white'
                     : msg.role === 'error'
-                    ? 'bg-red-50 text-red-700 border border-red-200'
-                    : 'bg-gray-100 text-gray-900'
+                    ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                    : 'bg-dark-700 text-gray-200'
                 }`}
               >
                 <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                 {msg.role === 'assistant' && msg.tokens != null && (
                   <p className="mt-1 text-xs text-gray-500">
-                    {msg.cached && <span className="text-amber-600 font-medium mr-1">⚡ Cached</span>}
+                    {msg.cached && <span className="text-amber-400 font-medium mr-1">⚡ Cached</span>}
                     {msg.tokens} tokens · ₹{msg.cost_inr.toFixed(4)}
-                    {msg.cached && <span className="ml-1 text-green-600">(saved!)</span>}
-                    {msg.model && <span className="ml-2 text-gray-400">via {msg.model}</span>}
+                    {msg.cached && <span className="ml-1 text-green-400">(saved!)</span>}
+                    {msg.model && <span className="ml-2 text-gray-500">via {msg.model}</span>}
                   </p>
                 )}
               </div>
@@ -209,11 +209,11 @@ export default function Playground() {
 
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-gray-100 rounded-xl px-4 py-3">
+              <div className="bg-dark-700 rounded-xl px-4 py-3">
                 <div className="flex items-center gap-1">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  <span className="w-2 h-2 bg-red-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-red-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-red-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
               </div>
             </div>
@@ -231,12 +231,12 @@ export default function Playground() {
             onKeyDown={handleKeyDown}
             placeholder="Type a message... (Enter to send, Shift+Enter for new line)"
             rows={2}
-            className="flex-1 px-4 py-3 border border-gray-300 rounded-xl resize-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
+            className="flex-1 px-4 py-3 bg-dark-800 border border-dark-600 text-gray-200 placeholder-gray-500 rounded-xl resize-none focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none text-sm"
           />
           <button
             onClick={handleSend}
             disabled={!input.trim() || loading}
-            className="px-4 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <PaperAirplaneIcon className="w-5 h-5" />
           </button>

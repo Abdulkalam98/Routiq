@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import Head from 'next/head';
 import Layout from '../components/Layout';
-import Link from 'next/link';
 import { useAuth } from '../lib/auth';
 import {
   CheckCircleIcon,
@@ -12,28 +11,27 @@ const plans = [
   {
     name: 'Free',
     price: '₹0',
-    limit: '1,000 requests/month',
-    tokenLimit: 1000,
+    limit: '100K tokens/month',
+    features: ['3 models', '10 req/min', 'Community support'],
   },
   {
     name: 'Starter',
     price: '₹999',
-    limit: '50,000 requests/month',
-    tokenLimit: 50000,
+    limit: '2M tokens/month',
+    features: ['All models', '60 req/min', 'Email support', 'Smart routing'],
   },
   {
     name: 'Pro',
     price: '₹2,999',
-    limit: 'Unlimited requests',
-    tokenLimit: null,
+    limit: '20M tokens/month',
+    features: ['All models', '300 req/min', 'Priority support', 'Smart routing', 'Custom caching'],
   },
 ];
 
 const paymentHistory = [
-  { id: 1, date: '2024-03-01', amount: '₹999', status: 'paid', invoice: 'INV-2024-003' },
-  { id: 2, date: '2024-02-01', amount: '₹999', status: 'paid', invoice: 'INV-2024-002' },
-  { id: 3, date: '2024-01-01', amount: '₹999', status: 'paid', invoice: 'INV-2024-001' },
-  { id: 4, date: '2023-12-01', amount: '₹0', status: 'free', invoice: 'INV-2023-012' },
+  { id: 1, date: '2026-07-01', amount: '₹999', status: 'paid', invoice: 'INV-2026-007' },
+  { id: 2, date: '2026-06-01', amount: '₹999', status: 'paid', invoice: 'INV-2026-006' },
+  { id: 3, date: '2026-05-18', amount: '₹0', status: 'free', invoice: 'INV-2026-005' },
 ];
 
 export default function Billing() {
@@ -51,25 +49,28 @@ export default function Billing() {
       </Head>
 
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-gray-900">Billing</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-white">Billing</h1>
+          <p className="text-sm text-gray-400 mt-1">Manage your subscription and payment history</p>
+        </div>
 
         {/* Current Plan */}
-        <div className="card p-6">
+        <div className="dashboard-card p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-white">
                 Current Plan
               </h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-gray-400 mt-1">
                 You are on the{' '}
-                <span className="font-medium text-primary-600">
+                <span className="font-medium text-red-400">
                   {currentPlan}
                 </span>{' '}
                 plan
               </p>
             </div>
             <div className="text-right">
-              <p className="text-3xl font-bold text-gray-900">₹999</p>
+              <p className="text-3xl font-bold text-white">₹999</p>
               <p className="text-sm text-gray-500">per month</p>
             </div>
           </div>
@@ -77,21 +78,21 @@ export default function Billing() {
           {/* Usage Bar */}
           <div className="mt-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">
+              <span className="text-sm font-medium text-gray-300">
                 Requests used this month
               </span>
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-gray-400">
                 {usage.used.toLocaleString()} / {usage.limit.toLocaleString()}
               </span>
             </div>
-            <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+            <div className="w-full h-2.5 bg-dark-600 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
                   usagePercent > 80
-                    ? 'bg-orange-500'
+                    ? 'bg-red-500'
                     : usagePercent > 60
-                    ? 'bg-yellow-500'
-                    : 'bg-primary-500'
+                    ? 'bg-amber-500'
+                    : 'bg-red-500'
                 }`}
                 style={{ width: `${Math.min(usagePercent, 100)}%` }}
               />
@@ -103,38 +104,48 @@ export default function Billing() {
         </div>
 
         {/* Plan Comparison */}
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Upgrade Plan
+        <div className="dashboard-card p-6">
+          <h2 className="text-lg font-semibold text-white mb-4">
+            Available Plans
           </h2>
           <div className="grid sm:grid-cols-3 gap-4">
             {plans.map((plan) => (
               <div
                 key={plan.name}
-                className={`rounded-lg border p-5 ${
+                className={`rounded-xl border p-5 transition-all ${
                   plan.name === currentPlan
-                    ? 'border-primary-500 bg-primary-50'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-red-500/50 bg-red-500/5'
+                    : 'border-dark-600 hover:border-dark-500 bg-dark-700/50'
                 }`}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-gray-900">{plan.name}</h3>
+                  <h3 className="font-semibold text-white">{plan.name}</h3>
                   {plan.name === currentPlan && (
-                    <span className="text-xs font-medium text-primary-600 bg-primary-100 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-medium text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full">
                       Current
                     </span>
                   )}
                 </div>
-                <p className="text-2xl font-bold text-gray-900">{plan.price}</p>
-                <p className="text-sm text-gray-500 mt-1">{plan.limit}</p>
+                <p className="text-2xl font-bold text-white">{plan.price}</p>
+                <p className="text-sm text-gray-400 mt-1">{plan.limit}</p>
+
+                {/* Features */}
+                <ul className="mt-3 space-y-1">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="text-xs text-gray-400 flex items-center gap-1.5">
+                      <CheckCircleIcon className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
 
                 {plan.name !== currentPlan && (
                   <button
                     className={`mt-4 w-full py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
                       plans.indexOf(plan) >
                       plans.findIndex((p) => p.name === currentPlan)
-                        ? 'bg-primary-500 hover:bg-primary-600 text-white'
-                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                        ? 'bg-red-600 hover:bg-red-700 text-white'
+                        : 'bg-dark-600 hover:bg-dark-500 text-gray-300'
                     }`}
                   >
                     {plans.indexOf(plan) >
@@ -150,7 +161,7 @@ export default function Billing() {
                 )}
 
                 {plan.name === currentPlan && (
-                  <div className="mt-4 flex items-center gap-1 text-sm text-primary-600">
+                  <div className="mt-4 flex items-center gap-1 text-sm text-red-400">
                     <CheckCircleIcon className="w-4 h-4" />
                     Active
                   </div>
@@ -161,51 +172,51 @@ export default function Billing() {
         </div>
 
         {/* Payment History */}
-        <div className="card overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
+        <div className="dashboard-card overflow-hidden">
+          <div className="p-6 border-b border-dark-600">
+            <h2 className="text-lg font-semibold text-white">
               Payment History
             </h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-50">
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <tr className="border-b border-dark-600">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Amount
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Invoice
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-dark-600">
                 {paymentHistory.map((payment) => (
-                  <tr key={payment.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <tr key={payment.id} className="hover:bg-dark-700/50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                       {payment.date}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
                       {payment.amount}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           payment.status === 'paid'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-600'
+                            ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                            : 'bg-gray-500/10 text-gray-400 border border-gray-500/20'
                         }`}
                       >
                         {payment.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-primary-600 hover:text-primary-800 cursor-pointer font-medium">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-red-400 hover:text-red-300 cursor-pointer font-medium">
                       {payment.invoice}
                     </td>
                   </tr>

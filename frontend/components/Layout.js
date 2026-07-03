@@ -54,7 +54,8 @@ export default function Layout({ children, dark = false }) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const isDark = dark || router.pathname === '/dashboard';
+  // All authenticated pages use dark theme
+  const isDark = true;
 
   return (
     <div className={`min-h-screen ${isDark ? 'bg-dark-900' : 'bg-gray-50'}`}>
@@ -113,7 +114,7 @@ function SidebarContent({ currentPath, onClose, isDark }) {
       {/* Logo */}
       <div className={`flex items-center justify-between h-16 px-6 border-b ${isDark ? 'border-dark-600' : 'border-gray-200'}`}>
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-sm">R</span>
           </div>
           <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Routiq</span>
@@ -139,7 +140,7 @@ function SidebarContent({ currentPath, onClose, isDark }) {
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive
                   ? isDark
-                    ? 'bg-primary-500/10 text-primary-400'
+                    ? 'bg-red-500/10 text-red-400'
                     : 'bg-primary-50 text-primary-700'
                   : isDark
                     ? 'text-gray-400 hover:bg-dark-700 hover:text-gray-200'
@@ -149,7 +150,7 @@ function SidebarContent({ currentPath, onClose, isDark }) {
               <item.icon
                 className={`w-5 h-5 ${
                   isActive
-                    ? isDark ? 'text-primary-400' : 'text-primary-500'
+                    ? isDark ? 'text-red-400' : 'text-primary-500'
                     : isDark ? 'text-gray-500' : 'text-gray-400'
                 }`}
               />
