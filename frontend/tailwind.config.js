@@ -20,6 +20,14 @@ module.exports = {
           900: '#312e81',
           950: '#1e1b4b',
         },
+        dark: {
+          900: '#0a0a0f',
+          800: '#111118',
+          700: '#1a1a24',
+          600: '#2a2a3a',
+          500: '#3a3a4a',
+          400: '#4a4a5a',
+        },
       },
       fontFamily: {
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],

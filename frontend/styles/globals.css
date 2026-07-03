@@ -31,4 +31,8 @@ code, pre, .font-mono {
   .card {
     @apply bg-white rounded-xl border border-gray-200 shadow-sm;
   }
+
+  .dashboard-card {
+    @apply bg-dark-800 rounded-xl border border-dark-600;
+  }
 }
