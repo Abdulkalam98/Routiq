@@ -20,7 +20,7 @@ export default function Navbar() {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
             <Link
-              href="#"
+              href="/docs"
               className="text-sm text-gray-300 hover:text-white transition-colors"
             >
               Docs
@@ -30,6 +30,12 @@ export default function Navbar() {
               className="text-sm text-gray-300 hover:text-white transition-colors"
             >
               Pricing
+            </Link>
+            <Link
+              href="/playground"
+              className="text-sm text-gray-300 hover:text-white transition-colors"
+            >
+              Playground
             </Link>
             <Link
               href="/dashboard"
@@ -63,7 +69,7 @@ export default function Navbar() {
           <div className="md:hidden py-4 border-t border-dark-600">
             <div className="flex flex-col gap-3">
               <Link
-                href="#"
+                href="/docs"
                 className="text-sm text-gray-300 hover:text-white px-3 py-2"
               >
                 Docs
@@ -73,6 +79,12 @@ export default function Navbar() {
                 className="text-sm text-gray-300 hover:text-white px-3 py-2"
               >
                 Pricing
+              </Link>
+              <Link
+                href="/playground"
+                className="text-sm text-gray-300 hover:text-white px-3 py-2"
+              >
+                Playground
               </Link>
               <Link
                 href="/dashboard"
