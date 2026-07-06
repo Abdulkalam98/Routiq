@@ -264,8 +264,24 @@ async def chat_completions(
     # --- Non-streaming response ---
 
     # Check cache first (only for non-streaming)
+    api_key_id = getattr(request.state, "api_key_id", None)
     cached = await get_cached_response(actual_model, request_body.messages)
     if cached:
+        # Log cache hit
+        asyncio.create_task(
+            log_usage(
+                customer_id=customer.id,
+                model=actual_model,
+                prompt_tokens=0,
+                completion_tokens=0,
+                cost_usd=0.0,
+                cost_inr=0.0,
+                completion_id=completion_id,
+                api_key_id=api_key_id,
+                status="cached",
+                cache_type="exact",
+            )
+        )
         return JSONResponse(
             content={
                 "id": completion_id,
@@ -287,6 +303,21 @@ async def chat_completions(
     # Semantic cache check (if exact match missed)
     semantic_hit = await find_similar_cached(request_body.messages, actual_model)
     if semantic_hit:
+        # Log semantic cache hit
+        asyncio.create_task(
+            log_usage(
+                customer_id=customer.id,
+                model=actual_model,
+                prompt_tokens=0,
+                completion_tokens=0,
+                cost_usd=0.0,
+                cost_inr=0.0,
+                completion_id=completion_id,
+                api_key_id=api_key_id,
+                status="cached",
+                cache_type="semantic",
+            )
+        )
         return JSONResponse(
             content={
                 "id": completion_id,
@@ -402,6 +433,7 @@ async def chat_completions(
     cost_usd, cost_inr = calculate_cost(
         actual_model, prompt_tokens, completion_tokens
     )
+    api_key_id = getattr(request.state, "api_key_id", None)
     asyncio.create_task(
         log_usage(
             customer_id=customer.id,
@@ -411,6 +443,10 @@ async def chat_completions(
             cost_usd=cost_usd,
             cost_inr=cost_inr,
             completion_id=completion_id,
+            api_key_id=api_key_id,
+            latency_ms=int((time.time() - created) * 1000),
+            status="success",
+            is_stream=False,
         )
     )
 
@@ -428,7 +464,6 @@ async def chat_completions(
     )
 
     # Increment token budget counter (async, fire-and-forget)
-    api_key_id = getattr(request.state, "api_key_id", None)
     if api_key_id:
         asyncio.create_task(increment_token_budget(api_key_id, total_tokens))
 

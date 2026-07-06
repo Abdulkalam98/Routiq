@@ -8,12 +8,14 @@ import {
   ArrowLeftOnRectangleIcon,
   Bars3Icon,
   XMarkIcon,
+  QueueListIcon,
 } from '@heroicons/react/24/outline';
 import { useState, useEffect } from 'react';
 import { getToken, logout } from '../lib/auth';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: ChartBarIcon },
+  { name: 'Logs', href: '/logs', icon: QueueListIcon },
   { name: 'Playground', href: '/playground', icon: ChatBubbleLeftRightIcon },
   { name: 'API Keys', href: '/keys', icon: KeyIcon },
   { name: 'Billing', href: '/billing', icon: CreditCardIcon },
