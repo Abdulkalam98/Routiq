@@ -302,3 +302,48 @@ curl -X POST https://routiq-api.onrender.com/v1/keys/create \
 - **Dashboard cards**: Use `.dashboard-card` class (defined in globals.css)
 - **Accent pattern**: Red for CTAs/active states, green for success badges, amber for warnings
 - **Logo**: Red square with white "R" (`bg-red-600`)
+
+## Priority Roadmap (Competitive Features)
+
+### Completed ✅
+- **Observability/Request Logs** — full request logs page, time-range filtering, cache hit tracking, paginated API
+
+### Week 2: BYOK + Output Guardrails
+- **BYOK (Bring Your Own Keys)** — users store their own OpenAI/Anthropic keys, Routiq adds caching + security + observability
+  - New table `user_provider_keys`, modify `get_provider()` to check user keys first
+  - Removes "why pay you?" objection: "Use YOUR keys, we add caching + security for free"
+- **Output Guardrails (JSON mode)** — `response_format: {type: "json_object", schema: {...}}`
+  - Retry loop: if response isn't valid JSON/schema, re-prompt up to 3x
+  - Every production app needs structured output
+
+### Week 3: Python SDK + npm Package
+- **Python SDK** — `pip install routiq` (thin wrapper over OpenAI SDK with `base_url` preset)
+- **npm package** — `npm install routiq` (same for JS devs)
+- Reduces integration from 5 lines to 2 lines
+
+### Week 4: Usage Alerts + Shareable Reports
+- **Usage alerts** — email/webhook when 80% budget consumed, daily cost summary
+- **Shareable reports** — public URL for monthly cost report (teams show savings to managers)
+- Email via Resend/SendGrid free tier
+
+### Future (Enterprise Lite)
+- **Team/project spaces** — one account → multiple projects → each with own keys, budgets, rate limits
+- **Prompt versioning** — save/deploy/rollback prompts like code
+- **Weighted load balancing** — `{"google": 0.7, "openai": 0.3}` routing weights
+- **A/B testing** — split traffic between prompt versions, track quality metrics
+- **Model comparison tool** — same prompt → 3 models → side-by-side responses
+- **Retry with exponential backoff** — 3 retries (1s/2s/4s) before fallback
+- **Audit log API** — `/v1/audit` endpoint with filters (compliance)
+
+### Competitive Positioning
+| Feature | Portkey ($18M) | TensorZero ($7.3M) | Routiq (₹0) |
+|---------|---------------|--------------------| ------------|
+| Gateway routing | ✅ | ✅ | ✅ |
+| Smart auto-routing | ❌ | ❌ | ✅ (model:"auto") |
+| Semantic caching | ❌ | ❌ | ✅ |
+| PII redaction | ❌ | ❌ | ✅ |
+| Prompt injection guard | ❌ | ❌ | ✅ |
+| Request logs | ✅ | ✅ | ✅ |
+| BYOK | ✅ | ❌ | 🔜 Week 2 |
+| Output guardrails | ✅ | ✅ | 🔜 Week 2 |
+| SDKs | ✅ | ✅ | 🔜 Week 3 |
