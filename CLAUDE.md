@@ -2,8 +2,8 @@
 
 ## Overview
 - **What**: AI API Gateway — route to multiple LLM providers, save 60% on tokens
-- **Website**: https://routiqai.vercel.app
-- **API**: https://routiq-api.onrender.com
+- **Website**: https://inferixai.vercel.app
+- **API**: https://inferix-api.onrender.com
 - **Repo**: https://github.com/Abdulkalam98/Routiq
 - **Tagline**: "Route smarter. Build faster."
 
@@ -400,13 +400,13 @@ cd backend && uvicorn main:app --reload
 cd frontend && npm install && npm run dev
 
 # Test API
-curl -X POST https://routiq-api.onrender.com/v1/chat/completions \
+curl -X POST https://inferix-api.onrender.com/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -d '{"model": "gemini-flash", "messages": [{"role": "user", "content": "Hello"}]}'
 
 # Create API key
-curl -X POST https://routiq-api.onrender.com/v1/keys/create \
+curl -X POST https://inferix-api.onrender.com/v1/keys/create \
   -H "Content-Type: application/json" \
   -d '{"name": "My Key", "email": "dev@routiq.io"}'
 ```

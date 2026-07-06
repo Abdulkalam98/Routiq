@@ -5,7 +5,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://routiq-api.onrender.com/:path*"
+      "destination": "https://inferix-api.onrender.com/:path*"
     }
   ]
 }
