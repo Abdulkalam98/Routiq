@@ -50,6 +50,9 @@ class UsageLog(Base):
     is_stream: Mapped[bool] = mapped_column(
         default=False, nullable=False
     )  # streaming vs non-streaming
+    key_source: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="platform"
+    )  # "platform" or "own" (BYOK)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

@@ -22,6 +22,7 @@ async def log_usage(
     cache_type: str | None = None,
     error_message: str | None = None,
     is_stream: bool = False,
+    key_source: str = "platform",
 ):
     """Log usage to database asynchronously. Failures are silently ignored."""
     try:
@@ -42,6 +43,7 @@ async def log_usage(
                 completion_id=completion_id or None,
                 error_message=error_message[:200] if error_message else None,
                 is_stream=is_stream,
+                key_source=key_source,
             )
             session.add(usage)
             await session.commit()

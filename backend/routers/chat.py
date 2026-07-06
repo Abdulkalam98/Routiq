@@ -18,12 +18,19 @@ from middleware.token_budget import check_token_budget, increment_token_budget
 from middleware.prompt_guard import check_prompt_injection, format_block_response
 from services.pii_redactor import redact_messages
 from services.router import get_provider, get_provider_smart, get_fallback_provider
+from services.byok import get_provider_for_customer
 from services.cost import calculate_cost
 from services.usage import log_usage
 from services.cache import get_cached_response, set_cached_response
 from services.semantic_cache import find_similar_cached, store_semantic_cache
 from services.context_window import trim_messages, get_tokens_saved
 from services.summarizer import summarize_turns, build_summary_message
+from services.json_guardrail import (
+    validate_json_response,
+    build_json_system_prompt,
+    build_retry_nudge,
+    clean_json_response,
+)
 
 logger = logging.getLogger("routiq.chat")
 
@@ -46,6 +53,7 @@ class ChatCompletionRequest(BaseModel):
     presence_penalty: float | None = None
     stop: str | list[str] | None = None
     user: str | None = None
+    response_format: dict | None = None  # {"type": "json_object"} or {"type": "json_schema", "schema": {...}}
 
 
 class UsageInfo(BaseModel):
@@ -196,15 +204,14 @@ async def chat_completions(
 
     # --- End security checks ---
 
-    # Resolve provider for requested model
+    # Resolve provider for requested model (BYOK: check user's own keys first)
     try:
-        if request_body.model == "auto":
-            provider, resolved_model, actual_model = get_provider_smart(
-                request_body.messages
-            )
-        else:
-            provider, resolved_model = get_provider(request_body.model)
-            actual_model = request_body.model
+        provider, resolved_model, key_source = await get_provider_for_customer(
+            customer_id=customer.id,
+            model_name=request_body.model,
+            messages=request_body.messages,
+        )
+        actual_model = request_body.model if request_body.model != "auto" else resolved_model
     except ValueError as e:
         return _openai_error(
             message=str(e),
@@ -215,6 +222,14 @@ async def chat_completions(
 
     # --- Streaming response ---
     if request_body.stream:
+        # JSON mode is incompatible with streaming
+        if request_body.response_format:
+            return _openai_error(
+                message="response_format is not supported with streaming. Set stream=false.",
+                error_type="invalid_request_error",
+                code="unsupported_parameter",
+                status_code=400,
+            )
         stream_api_key_id = getattr(request.state, "api_key_id", None)
         try:
             return StreamingResponse(
@@ -357,32 +372,27 @@ async def chat_completions(
         else:
             messages_to_send = trimmed_messages
 
-    try:
-        result = await provider.chat_completion(
-            model=resolved_model,
-            messages=messages_to_send,
-            temperature=request_body.temperature,
-            max_tokens=request_body.max_tokens,
-            top_p=request_body.top_p,
-            frequency_penalty=request_body.frequency_penalty,
-            presence_penalty=request_body.presence_penalty,
-            stop=request_body.stop,
-        )
-    except Exception as primary_err:
-        # Attempt fallback provider
-        fallback_result = get_fallback_provider(request_body.model)
-        if fallback_result is None:
-            return _openai_error(
-                message=f"Provider error: {str(primary_err)}",
-                error_type="server_error",
-                code="provider_error",
-                status_code=503,
-            )
-        fallback_provider, fallback_model = fallback_result
+    # --- JSON mode: inject system prompt ---
+    json_valid = True
+    if request_body.response_format:
+        json_system_prompt = build_json_system_prompt(request_body.response_format)
+        if json_system_prompt:
+            if messages_to_send and messages_to_send[0].get("role") == "system":
+                messages_to_send = [
+                    {**messages_to_send[0], "content": messages_to_send[0]["content"] + "\n\n" + json_system_prompt}
+                ] + messages_to_send[1:]
+            else:
+                messages_to_send = [{"role": "system", "content": json_system_prompt}] + messages_to_send
+
+    # --- Provider call (with JSON retry loop) ---
+    max_retries = 3 if request_body.response_format else 0
+    retry_messages = messages_to_send
+
+    for attempt in range(max_retries + 1):
         try:
-            result = await fallback_provider.chat_completion(
-                model=fallback_model,
-                messages=messages_to_send,
+            result = await provider.chat_completion(
+                model=resolved_model,
+                messages=retry_messages,
                 temperature=request_body.temperature,
                 max_tokens=request_body.max_tokens,
                 top_p=request_body.top_p,
@@ -390,13 +400,67 @@ async def chat_completions(
                 presence_penalty=request_body.presence_penalty,
                 stop=request_body.stop,
             )
-        except Exception as fallback_err:
-            return _openai_error(
-                message=f"All providers failed. Primary: {str(primary_err)}. Fallback: {str(fallback_err)}",
-                error_type="server_error",
-                code="provider_error",
-                status_code=503,
-            )
+        except Exception as primary_err:
+            # No fallback when using BYOK (user's key, user's risk)
+            if key_source == "own":
+                return _openai_error(
+                    message=f"Provider error with your API key: {str(primary_err)}",
+                    error_type="server_error",
+                    code="provider_error",
+                    status_code=503,
+                )
+            # Attempt fallback provider (platform keys only)
+            fallback_result = get_fallback_provider(request_body.model)
+            if fallback_result is None:
+                return _openai_error(
+                    message=f"Provider error: {str(primary_err)}",
+                    error_type="server_error",
+                    code="provider_error",
+                    status_code=503,
+                )
+            fallback_provider, fallback_model = fallback_result
+            try:
+                result = await fallback_provider.chat_completion(
+                    model=fallback_model,
+                    messages=retry_messages,
+                    temperature=request_body.temperature,
+                    max_tokens=request_body.max_tokens,
+                    top_p=request_body.top_p,
+                    frequency_penalty=request_body.frequency_penalty,
+                    presence_penalty=request_body.presence_penalty,
+                    stop=request_body.stop,
+                )
+            except Exception as fallback_err:
+                return _openai_error(
+                    message=f"All providers failed. Primary: {str(primary_err)}. Fallback: {str(fallback_err)}",
+                    error_type="server_error",
+                    code="provider_error",
+                    status_code=503,
+                )
+
+        # Extract content for JSON validation
+        resp_content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+        if not request_body.response_format:
+            break  # No validation needed
+
+        is_valid, error_msg = validate_json_response(resp_content, request_body.response_format)
+        if is_valid:
+            # Clean code fences if present
+            cleaned = clean_json_response(resp_content)
+            if cleaned != resp_content:
+                result["choices"][0]["message"]["content"] = cleaned
+            json_valid = True
+            break
+
+        json_valid = False
+        if attempt < max_retries:
+            # Append failed response + retry nudge for next attempt
+            retry_messages = retry_messages + [
+                {"role": "assistant", "content": resp_content},
+                build_retry_nudge(error_msg or "Invalid JSON"),
+            ]
+            logger.info("JSON guardrail retry %d/%d: %s", attempt + 1, max_retries, error_msg)
 
     # Extract response data from provider result (OpenAI nested format)
     choices = result.get("choices", [])
@@ -447,6 +511,7 @@ async def chat_completions(
             latency_ms=int((time.time() - created) * 1000),
             status="success",
             is_stream=False,
+            key_source=key_source,
         )
     )
 
@@ -467,7 +532,7 @@ async def chat_completions(
     if api_key_id:
         asyncio.create_task(increment_token_budget(api_key_id, total_tokens))
 
-    # Build response headers (tokens saved + security headers)
+    # Build response headers (tokens saved + security headers + guardrails)
     headers = {}
     if tokens_saved > 0:
         headers["X-Routiq-Tokens-Saved"] = str(tokens_saved)
@@ -475,5 +540,9 @@ async def chat_completions(
         headers["X-Routiq-PII-Redacted"] = str(pii_report.total)
     if injection_result.action == "warn":
         headers["X-Routiq-Injection-Risk"] = "medium"
+    if request_body.response_format:
+        headers["X-Routiq-JSON-Valid"] = "true" if json_valid else "false"
+    if key_source == "own":
+        headers["X-Routiq-Key-Source"] = "own"
 
     return JSONResponse(content=response.model_dump(), headers=headers) if headers else response

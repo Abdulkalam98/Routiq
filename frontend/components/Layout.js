@@ -9,6 +9,7 @@ import {
   Bars3Icon,
   XMarkIcon,
   QueueListIcon,
+  WrenchScrewdriverIcon,
 } from '@heroicons/react/24/outline';
 import { useState, useEffect } from 'react';
 import { getToken, logout } from '../lib/auth';
@@ -18,6 +19,7 @@ const navigation = [
   { name: 'Logs', href: '/logs', icon: QueueListIcon },
   { name: 'Playground', href: '/playground', icon: ChatBubbleLeftRightIcon },
   { name: 'API Keys', href: '/keys', icon: KeyIcon },
+  { name: 'Provider Keys', href: '/provider-keys', icon: WrenchScrewdriverIcon },
   { name: 'Billing', href: '/billing', icon: CreditCardIcon },
 ];
 

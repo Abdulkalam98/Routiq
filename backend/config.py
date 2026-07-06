@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     upstash_redis_url: str = ""
     upstash_redis_token: str = ""
 
+    # Encryption (for BYOK stored keys)
+    encryption_key: str = ""  # Fernet key — generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
     # LLM Providers
     openai_api_key: str = ""
     anthropic_api_key: str = ""

@@ -12,3 +12,5 @@ pydantic-settings==2.5.2
 setuptools
 razorpay==1.4.2
 python-dotenv==1.0.1
+cryptography>=42.0.0
+jsonschema>=4.21.0
