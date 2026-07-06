@@ -28,9 +28,10 @@
 - `DELETE /v1/keys/{id}` — Revoke key (requires JWT auth)
 - `GET /v1/models` — List available models
 - `POST /v1/playground/chat` — Playground chat (JWT auth, supports smart routing + caching)
-- `GET /v1/dashboard/stats` — Today's spend/requests + month total (JWT auth)
-- `GET /v1/dashboard/cost-by-model` — Cost breakdown by model (JWT auth)
-- `GET /v1/dashboard/requests` — Recent request logs (JWT auth)
+- `GET /v1/dashboard/stats?range=30d` — Aggregated stats for time range (JWT auth)
+- `GET /v1/dashboard/cost-by-model?range=30d` — Cost/tokens/requests by model (JWT auth)
+- `GET /v1/dashboard/requests?limit=50&range=30d` — Recent requests with status (JWT auth)
+- `GET /v1/dashboard/logs?limit=50&offset=0&model=X&status=Y&range=7d` — Full logs, paginated (JWT auth)
 - `GET /health` — Health check
 
 ## Key Architecture Decisions
@@ -69,11 +70,12 @@ routiq/
 │   │   ├── summarizer.py    # Conversation summarization via gemini-flash
 │   │   ├── pii_redactor.py  # PII detection & redaction (regex)
 │   │   ├── cost.py          # Token cost calculation
-│   │   ├── usage.py         # Async usage logging
+│   │   ├── usage.py         # Async usage logging (with observability fields)
 │   │   └── billing.py       # Razorpay integration
-│   └── models/       # customer, api_key, usage_log, payment
+│   ├── models/       # customer, api_key, usage_log, payment
+│   └── migrations/   # SQL migration scripts (run manually on Supabase)
 ├── frontend/         # Next.js 14
-│   ├── pages/        # index, docs, dashboard, keys, billing, playground, login, signup
+│   ├── pages/        # index, docs, dashboard, logs, keys, billing, playground, login, signup
 │   ├── components/   # Layout, Navbar
 │   └── vercel.json   # Rewrites /api/* → Render
 └── CLAUDE.md         # This file
@@ -197,6 +199,40 @@ Auth → Rate Limit → Token Budget → Prompt Injection → PII Redaction → 
 - **OpenAI-compatible errors**: `{error: {message, type, code}}` format
 - **Async increments**: budget tracking never blocks the response
 
+## Observability (`routers/dashboard.py` + `frontend/pages/logs.js`)
+
+### UsageLog Model (Enhanced)
+- **Core fields**: customer_id, api_key_id, model, provider, prompt_tokens, completion_tokens, cost_usd, cost_inr, latency_ms, created_at
+- **Observability fields**: status (success/cached/error), cache_type (exact/semantic/null), completion_id, error_message (truncated 200 chars), is_stream (bool)
+- **Indexes**: customer_id, api_key_id, created_at, status
+
+### Dashboard API
+- All endpoints support `?range=` param: `24h`, `7d`, `30d`, `90d`
+- `/dashboard/stats` returns: total_spend, total_tokens, total_requests, cache_hit_rate, avg_spend_per_day, avg_tokens_per_day
+- `/dashboard/cost-by-model` returns: model, cost, tokens, requests (per model)
+- `/dashboard/requests` returns: full request details with status, cache_type, is_stream
+- `/dashboard/logs` returns: paginated logs with `{logs, total, limit, offset, has_more}`
+
+### Logs Page (`/logs`)
+- Filterable table: time range, model, status
+- Expandable row details: request ID, provider, token breakdown, error message
+- Color-coded status badges: green (success), blue (cached), red (error)
+- Latency indicators: green (<1s), yellow (1-3s), red (>3s)
+- Summary stats bar: avg latency, cache hit ratio, total cost, error count
+- Pagination: 50 per page, prev/next navigation
+- CSV export of current view
+
+### Cache Hit Logging
+- Cache hits (both exact and semantic) are logged as separate UsageLog entries
+- `status="cached"`, `cache_type="exact"|"semantic"`, tokens=0, cost=0
+- Enables accurate cache hit rate calculation in dashboard
+
+### Critical Patterns
+- `_get_range_start(range)` converts range string to UTC datetime
+- Dashboard returns zeros (not errors) when no data
+- `getattr(log, "field", default)` used for backward compat with old rows missing new columns
+- `log_usage()` accepts all observability fields as optional kwargs (backward compatible)
+
 ## Git Profile
 - GitHub account: Abdulkalam98
 - Other account: Abdul0898 (may be default active)
@@ -248,10 +284,16 @@ curl -X POST https://routiq-api.onrender.com/v1/keys/create \
 - Token reduction features added 2026-07-03 (semantic caching, context window, summarization)
 - Landing page updated 2026-07-03 (removed India-specific copy, added token-saving feature cards)
 - Security features added 2026-07-03 (token budget per key, PII redaction, prompt injection detection)
+- Observability added 2026-07-06 (request logs page, time-range filtering, enhanced UsageLog, cache hit tracking)
 - Navbar links: Docs → /docs, Pricing → #pricing, Playground → /playground, Dashboard → /dashboard
+- Sidebar nav order: Dashboard, Logs, Playground, API Keys, Billing
 - No tests written yet — add pytest + jest when ready
 - Playground presets: Summarizer, Translator, Code Helper, Explainer, Grammar Fixer (frontend-only)
 - Docs page uses IntersectionObserver for scroll-aware sidebar highlighting
+
+## Migrations
+- `backend/migrations/002_add_observability_columns.sql` — adds status, cache_type, completion_id, error_message, is_stream to usage_logs
+- Run migrations manually on Supabase SQL Editor (no auto-migration tool)
 
 ## UI Theme
 - **Global**: Dark theme (`bg-dark-900`) with red accent (`red-600` buttons, `red-400` text highlights)
