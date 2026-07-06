@@ -14,7 +14,7 @@ const plans = [
     name: 'Free',
     price: '₹0',
     period: '/month',
-    description: 'Get started with Routiq',
+    description: 'Get started with Inferix',
     features: [
       '100K tokens/month',
       '3 models (GPT-4o-mini, Claude Haiku, Gemini Flash)',
@@ -88,7 +88,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Routiq - One API. Every AI Model. Save 60% on Tokens.</title>
+        <title>Inferix - One API. Every AI Model. Save 60% on Tokens.</title>
         <meta
           name="description"
           content="Route smarter. Build faster. Access OpenAI, Anthropic, Google, and Mistral through one API with smart routing, semantic caching, and context compression."
@@ -141,7 +141,7 @@ export default function Home() {
                     <span className="text-orange-300">base_url</span>
                     <span className="text-white">=</span>
                     <span className="text-green-300">
-                      {'"https://api.routiq.io/v1"'}
+                      {'"https://api.inferix.ai/v1"'}
                     </span>
                     {'\n'}
                     <span className="text-white">)</span>
@@ -262,7 +262,7 @@ export default function Home() {
               Route smarter. Build faster.
             </p>
             <p className="mt-2 text-gray-500 text-xs">
-              &copy; {new Date().getFullYear()} Routiq. All rights reserved.
+              &copy; {new Date().getFullYear()} Inferix. All rights reserved.
             </p>
           </div>
         </footer>

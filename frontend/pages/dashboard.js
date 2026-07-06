@@ -153,7 +153,7 @@ export default function Dashboard() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `routiq-usage-${timeRange}.csv`;
+    a.download = `inferix-usage-${timeRange}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -172,7 +172,7 @@ export default function Dashboard() {
   return (
     <Layout>
       <Head>
-        <title>Usage Dashboard - Routiq</title>
+        <title>Usage Dashboard - Inferix</title>
       </Head>
 
       <div className="space-y-6">

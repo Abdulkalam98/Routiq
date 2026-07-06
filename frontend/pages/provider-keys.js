@@ -174,7 +174,7 @@ export default function ProviderKeys() {
   return (
     <Layout>
       <Head>
-        <title>Provider Keys - Routiq</title>
+        <title>Provider Keys - Inferix</title>
       </Head>
 
       <div className="space-y-6">
@@ -182,7 +182,7 @@ export default function ProviderKeys() {
         <div>
           <h1 className="text-2xl font-bold text-white">Provider Keys (BYOK)</h1>
           <p className="text-sm text-gray-400 mt-1">
-            Bring Your Own Keys — use your own API keys with Routiq's caching, security, and observability
+            Bring Your Own Keys — use your own API keys with Inferix's caching, security, and observability
           </p>
         </div>
 
@@ -193,7 +193,7 @@ export default function ProviderKeys() {
             <div className="text-sm">
               <p className="text-gray-300 font-medium">How BYOK works</p>
               <p className="text-gray-500 mt-1">
-                Add your own provider keys below. When you make API calls, Routiq will use YOUR key
+                Add your own provider keys below. When you make API calls, Inferix will use YOUR key
                 instead of the platform key — you still get caching, PII redaction, prompt injection
                 detection, and full observability. If no key is set, the platform key is used automatically.
               </p>

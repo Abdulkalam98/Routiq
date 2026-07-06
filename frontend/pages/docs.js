@@ -95,8 +95,8 @@ export default function Docs() {
   return (
     <>
       <Head>
-        <title>Documentation - Routiq</title>
-        <meta name="description" content="Routiq API documentation. OpenAI-compatible endpoint for multiple LLM providers." />
+        <title>Documentation - Inferix</title>
+        <meta name="description" content="Inferix API documentation. OpenAI-compatible endpoint for multiple LLM providers." />
       </Head>
 
       <div className="min-h-screen bg-dark-900">
@@ -138,7 +138,7 @@ export default function Docs() {
               <section id="quickstart" className="mb-16">
                 <h1 className="text-3xl font-bold text-white mb-2">Quick Start</h1>
                 <p className="text-gray-400 mb-6">
-                  Get running with Routiq in 30 seconds. No SDK changes needed.
+                  Get running with Inferix in 30 seconds. No SDK changes needed.
                 </p>
 
                 <div className="space-y-6">
@@ -149,7 +149,7 @@ export default function Docs() {
                       <p className="text-gray-400 text-sm mb-2">
                         Create one from the <Link href="/keys" className="text-red-400 hover:text-red-300 underline">dashboard</Link> or via curl:
                       </p>
-                      <CodeBlock language="bash" code={`curl -X POST https://routiq-api.onrender.com/v1/keys/create \\
+                      <CodeBlock language="bash" code={`curl -X POST https://inferix-api.onrender.com/v1/keys/create \\
   -H "Content-Type: application/json" \\
   -d '{"name": "My App", "email": "you@example.com"}'`} />
                     </div>
@@ -163,7 +163,7 @@ export default function Docs() {
 
 client = OpenAI(
     api_key="rq_your_key_here",
-    base_url="https://routiq-api.onrender.com/v1"
+    base_url="https://inferix-api.onrender.com/v1"
 )
 
 response = client.chat.completions.create(
@@ -211,14 +211,14 @@ print(response.choices[0].message.content)`} />
                 <EndpointBadge method="POST" path="/v1/chat/completions" />
 
                 <h3 className="text-lg font-semibold text-white mt-6 mb-2">Request</h3>
-                <CodeBlock language="bash" code={`curl -X POST https://routiq-api.onrender.com/v1/chat/completions \\
+                <CodeBlock language="bash" code={`curl -X POST https://inferix-api.onrender.com/v1/chat/completions \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer rq_your_key" \\
   -d '{
     "model": "gemini-flash",
     "messages": [
       {"role": "system", "content": "You are a helpful assistant."},
-      {"role": "user", "content": "What is Routiq?"}
+      {"role": "user", "content": "What is Inferix?"}
     ],
     "temperature": 0.7,
     "max_tokens": 500
@@ -232,7 +232,7 @@ print(response.choices[0].message.content)`} />
   "model": "gemini-flash",
   "choices": [{
     "index": 0,
-    "message": {"role": "assistant", "content": "Routiq is an AI API gateway..."},
+    "message": {"role": "assistant", "content": "Inferix is an AI API gateway..."},
     "finish_reason": "stop"
   }],
   "usage": {
@@ -286,7 +286,7 @@ for chunk in stream:
                       <th className="px-4 py-2.5 text-left text-gray-400 font-medium">Best For</th>
                     </tr></thead>
                     <tbody className="divide-y divide-dark-600">
-                      <tr className="hover:bg-dark-800/50"><td className="px-4 py-2.5 font-mono text-red-400 font-medium">auto</td><td className="px-4 py-2.5 text-gray-300">Routiq</td><td className="px-4 py-2.5 text-gray-400">Smart routing — cheapest model for your prompt</td></tr>
+                      <tr className="hover:bg-dark-800/50"><td className="px-4 py-2.5 font-mono text-red-400 font-medium">auto</td><td className="px-4 py-2.5 text-gray-300">Inferix</td><td className="px-4 py-2.5 text-gray-400">Smart routing — cheapest model for your prompt</td></tr>
                       <tr className="hover:bg-dark-800/50"><td className="px-4 py-2.5 font-mono text-gray-300">gemini-flash</td><td className="px-4 py-2.5 text-gray-300">Google</td><td className="px-4 py-2.5 text-gray-400">Fast, cheap, general tasks</td></tr>
                       <tr className="hover:bg-dark-800/50"><td className="px-4 py-2.5 font-mono text-gray-300">gemini-1.5-pro</td><td className="px-4 py-2.5 text-gray-300">Google</td><td className="px-4 py-2.5 text-gray-400">Long context, complex reasoning</td></tr>
                       <tr className="hover:bg-dark-800/50"><td className="px-4 py-2.5 font-mono text-gray-300">gpt-4o</td><td className="px-4 py-2.5 text-gray-300">OpenAI</td><td className="px-4 py-2.5 text-gray-400">Best overall quality</td></tr>
@@ -304,7 +304,7 @@ for chunk in stream:
               <section id="smart-routing" className="mb-16">
                 <h2 className="text-2xl font-bold text-white mb-3">Smart Routing</h2>
                 <p className="text-gray-400 mb-4">
-                  Use <code className="text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded text-xs">model: &quot;auto&quot;</code> — Routiq classifies your prompt and picks the cheapest adequate model. Zero extra LLM calls.
+                  Use <code className="text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded text-xs">model: &quot;auto&quot;</code> — Inferix classifies your prompt and picks the cheapest adequate model. Zero extra LLM calls.
                 </p>
 
                 <div className="grid grid-cols-3 gap-3 mb-6">
@@ -325,7 +325,7 @@ for chunk in stream:
                   </div>
                 </div>
 
-                <CodeBlock language="python" code={`# Smart routing — Routiq picks the best model
+                <CodeBlock language="python" code={`# Smart routing — Inferix picks the best model
 response = client.chat.completions.create(
     model="auto",
     messages=[{"role": "user", "content": "What's 2+2?"}]
@@ -365,7 +365,7 @@ response = client.chat.completions.create(
                 </div>
 
                 <p className="text-gray-400 text-sm">
-                  Cache hit header: <code className="text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded text-xs">X-Routiq-Cached: true</code>
+                  Cache hit header: <code className="text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded text-xs">X-Inferix-Cached: true</code>
                 </p>
               </section>
 
@@ -387,7 +387,7 @@ response = client.chat.completions.create(
                 </div>
 
                 <p className="text-gray-400 text-sm">
-                  Tokens saved header: <code className="text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded text-xs">X-Routiq-Tokens-Saved: 1240</code>
+                  Tokens saved header: <code className="text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded text-xs">X-Inferix-Tokens-Saved: 1240</code>
                 </p>
               </section>
 

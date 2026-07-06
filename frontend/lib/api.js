@@ -1,6 +1,6 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-class RoutiqAPI {
+class InferixAPI {
   constructor(token = null) {
     this.baseURL = API_URL;
     this.token = token;
@@ -83,5 +83,5 @@ class RoutiqAPI {
   }
 }
 
-export const api = new RoutiqAPI();
-export default RoutiqAPI;
+export const api = new InferixAPI();
+export default InferixAPI;

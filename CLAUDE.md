@@ -21,7 +21,7 @@
 - Customer UUID: `ea0ad5aa-d5bc-495e-b58f-e73d886424ec`
 
 ## Key Endpoints
-- `POST /v1/chat/completions` — OpenAI-compatible (requires API key auth, supports `model: "auto"`)
+- `POST /v1/chat/completions` — OpenAI-compatible (requires API key auth, supports `model: "auto"`, `response_format`)
 - `POST /v1/keys/create` — Create API key with `{name, email}` (no JWT)
 - `POST /v1/keys` — Create API key (requires JWT auth)
 - `GET /v1/keys` — List keys (requires JWT auth)
@@ -32,6 +32,11 @@
 - `GET /v1/dashboard/cost-by-model?range=30d` — Cost/tokens/requests by model (JWT auth)
 - `GET /v1/dashboard/requests?limit=50&range=30d` — Recent requests with status (JWT auth)
 - `GET /v1/dashboard/logs?limit=50&offset=0&model=X&status=Y&range=7d` — Full logs, paginated (JWT auth)
+- `GET /v1/provider-keys` — List user's BYOK keys (JWT auth)
+- `POST /v1/provider-keys` — Add provider key `{provider, api_key, label}` (JWT auth)
+- `PUT /v1/provider-keys/{provider}` — Update provider key (JWT auth)
+- `DELETE /v1/provider-keys/{provider}` — Remove provider key (JWT auth)
+- `POST /v1/provider-keys/{provider}/test` — Test provider key validity (JWT auth)
 - `GET /health` — Health check
 
 ## Key Architecture Decisions
@@ -50,15 +55,18 @@
 - Conversation summarization: gemini-flash compresses dropped messages → inject as system context
 - All token-reduction features fail open — errors never block the request
 - Security pipeline: token budget → prompt injection → PII redaction (all before provider call)
+- BYOK: one key per provider per customer, Fernet-encrypted, no global fallback when user's key fails
+- Output guardrails: JSON mode with auto-retry (up to 3x), streaming + JSON mode returns 400
+- Provider resolution: `get_provider_for_customer()` checks BYOK first, falls back to platform key
 
 ## Project Structure
 ```
 routiq/
 ├── backend/          # FastAPI app
 │   ├── main.py       # App entry, router registration
-│   ├── config.py     # Pydantic settings
+│   ├── config.py     # Pydantic settings (+ encryption_key)
 │   ├── database.py   # Async SQLAlchemy + Supabase pooler
-│   ├── routers/      # chat, models, keys, billing, playground, dashboard, auth
+│   ├── routers/      # chat, models, keys, billing, playground, dashboard, auth, provider_keys
 │   ├── middleware/    # auth (API key), ratelimit (Upstash), token_budget, prompt_guard
 │   ├── services/
 │   │   ├── providers/       # openai, anthropic, google, mistral
@@ -69,20 +77,24 @@ routiq/
 │   │   ├── context_window.py # Token trimming + message windowing
 │   │   ├── summarizer.py    # Conversation summarization via gemini-flash
 │   │   ├── pii_redactor.py  # PII detection & redaction (regex)
-│   │   ├── cost.py          # Token cost calculation
+│   │   ├── cost.py          # Token cost calculation (5% markup, INR conversion)
 │   │   ├── usage.py         # Async usage logging (with observability fields)
-│   │   └── billing.py       # Razorpay integration
-│   ├── models/       # customer, api_key, usage_log, payment
+│   │   ├── billing.py       # Razorpay integration
+│   │   ├── encryption.py    # Fernet encrypt/decrypt for BYOK keys
+│   │   ├── byok.py          # BYOK provider resolution + instance caching
+│   │   └── json_guardrail.py # JSON mode validation + retry logic
+│   ├── models/       # customer, api_key, usage_log, payment, user_provider_key
 │   └── migrations/   # SQL migration scripts (run manually on Supabase)
 ├── frontend/         # Next.js 14
-│   ├── pages/        # index, docs, dashboard, logs, keys, billing, playground, login, signup
+│   ├── pages/        # index, docs, dashboard, logs, keys, billing, playground, login, signup, provider-keys
 │   ├── components/   # Layout, Navbar
 │   └── vercel.json   # Rewrites /api/* → Render
 └── CLAUDE.md         # This file
 ```
 
 ## Critical Patterns
-- `get_provider()` returns `tuple[BaseLLMProvider, str]` — always unpack
+- `get_provider_for_customer(customer_id, model, messages)` returns `tuple[BaseLLMProvider, str, str]` — (provider, resolved_model, key_source)
+- `get_provider()` returns `tuple[BaseLLMProvider, str]` — always unpack (used internally by byok.py)
 - `get_provider_smart(messages)` returns `tuple[BaseLLMProvider, str, str]` — (provider, resolved_model, actual_model)
 - Provider `chat_completion()` returns nested OpenAI format (choices/usage)
 - Streaming method is `chat_completion_stream()` (not `stream_chat_completion`)
@@ -104,6 +116,9 @@ routiq/
 - Token budget key: `budget:{api_key_id}:daily`, TTL resets at midnight UTC
 - Prompt guard: score-based (high=+2, medium=+1), block≥3, warn≥1
 - PII redactor: only scans user-role messages, system prompts left intact
+- BYOK provider instances cached by `(customer_id, provider)` tuple with 5-min TTL, max 500 entries
+- JSON guardrail: `_strip_code_fences()` handles ```json wrapping from models
+- No global fallback when `key_source == "own"` — user's key fails, error returned directly
 
 ## Environment Variables (Render)
 - `DATABASE_URL` — Supabase Session Pooler (`postgresql+asyncpg://...`)
@@ -111,6 +126,7 @@ routiq/
 - `GOOGLE_API_KEY` — Google AI Studio key
 - `PYTHON_VERSION` = `3.12.3`
 - `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`
+- `ENCRYPTION_KEY` — Fernet key for BYOK key encryption (generate via `Fernet.generate_key()`)
 
 ## Pricing Plans
 - Free: ₹0 — 100K tokens/month, 3 models, 10 req/min
@@ -203,7 +219,7 @@ Auth → Rate Limit → Token Budget → Prompt Injection → PII Redaction → 
 
 ### UsageLog Model (Enhanced)
 - **Core fields**: customer_id, api_key_id, model, provider, prompt_tokens, completion_tokens, cost_usd, cost_inr, latency_ms, created_at
-- **Observability fields**: status (success/cached/error), cache_type (exact/semantic/null), completion_id, error_message (truncated 200 chars), is_stream (bool)
+- **Observability fields**: status (success/cached/error), cache_type (exact/semantic/null), completion_id, error_message (truncated 200 chars), is_stream (bool), key_source (platform/own)
 - **Indexes**: customer_id, api_key_id, created_at, status
 
 ### Dashboard API
@@ -232,6 +248,125 @@ Auth → Rate Limit → Token Budget → Prompt Injection → PII Redaction → 
 - Dashboard returns zeros (not errors) when no data
 - `getattr(log, "field", default)` used for backward compat with old rows missing new columns
 - `log_usage()` accepts all observability fields as optional kwargs (backward compatible)
+
+## Cost Calculation (`services/cost.py`)
+
+### Pricing Table (per 1K tokens, USD)
+| Model | Input | Output |
+|-------|-------|--------|
+| gpt-4o | $0.005 | $0.015 |
+| gpt-4o-mini | $0.00015 | $0.0006 |
+| claude-sonnet-4-6 | $0.003 | $0.015 |
+| claude-haiku | $0.00025 | $0.00125 |
+| gemini-1.5-pro | $0.00125 | $0.005 |
+| gemini-flash | $0.000075 | $0.0003 |
+| mistral-large | $0.002 | $0.006 |
+| mistral-small | $0.0002 | $0.0006 |
+
+### Formula
+```
+MARKUP = 1.05 (5%)
+USD_TO_INR = 84.0
+
+input_cost  = (prompt_tokens / 1000) × price_input × 1.05
+output_cost = (completion_tokens / 1000) × price_output × 1.05
+cost_usd = input_cost + output_cost
+cost_inr = cost_usd × 84.0
+```
+
+### Cost Flow
+- Provider returns `usage.prompt_tokens` + `usage.completion_tokens`
+- `calculate_cost(model, prompt_tokens, completion_tokens)` → `(cost_usd, cost_inr)`
+- Cache hits: cost = ₹0.00 (tokens = 0)
+- Errors: cost = ₹0.00
+- Dashboard displays everything in INR only
+
+## BYOK — Bring Your Own Keys (`services/byok.py` + `routers/provider_keys.py`)
+
+### How It Works
+- Users store their own OpenAI/Anthropic/Google/Mistral API keys
+- Routiq adds caching, security, observability on top of user's keys
+- One key per provider per customer (UNIQUE constraint)
+- Keys encrypted with Fernet (`services/encryption.py`) before storage
+- Never return full decrypted key in API responses (only last 4 chars as `key_suffix`)
+
+### Provider Resolution Order
+```
+get_provider_for_customer(customer_id, model, messages):
+  1. Check user_provider_keys for matching provider
+  2. If found → use user's key (key_source = "own")
+  3. If not found → use platform key (key_source = "platform")
+  4. If key_source == "own" and call fails → return error (NO global fallback)
+```
+
+### Instance Caching
+- BYOK provider instances cached in `_byok_cache` dict
+- Key: `(customer_id, provider)` tuple
+- TTL: 5 minutes, max 500 entries
+- `invalidate_byok_cache(customer_id, provider)` on key update/delete
+
+### Database Table
+```sql
+user_provider_keys (
+  id UUID PRIMARY KEY,
+  customer_id UUID REFERENCES customers(id),
+  provider VARCHAR(50),           -- openai, anthropic, google, mistral
+  encrypted_key TEXT,             -- Fernet-encrypted API key
+  key_label VARCHAR(255),         -- user-friendly label
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at, updated_at,
+  UNIQUE(customer_id, provider)
+)
+```
+
+### Response Headers
+- `X-Routiq-Key-Source: own|platform` — which key was used
+
+### Frontend
+- Provider Keys page: `/provider-keys`
+- Cards per provider (OpenAI/Anthropic/Google/Mistral)
+- Add, update, test, delete keys via modal UI
+
+## Output Guardrails — JSON Mode (`services/json_guardrail.py`)
+
+### How It Works
+- Request includes `response_format: {type: "json_object"}` or `{type: "json_schema", schema: {...}}`
+- System prompt injected: "Respond with valid JSON only"
+- Validate response with `json.loads()` + optional `jsonschema.validate()`
+- If invalid → append retry nudge → call provider again (up to 3x)
+- Strips markdown code fences (```json ... ```) automatically
+
+### Request Format (OpenAI-compatible)
+```json
+{
+  "model": "gemini-flash",
+  "messages": [{"role": "user", "content": "List 3 colors"}],
+  "response_format": {"type": "json_object"}
+}
+```
+
+### Schema Validation
+```json
+{
+  "response_format": {
+    "type": "json_schema",
+    "schema": {"type": "object", "properties": {"colors": {"type": "array"}}, "required": ["colors"]}
+  }
+}
+```
+
+### Guards
+- `stream: true` + `response_format` → 400 error (can't validate partial JSON)
+- All retries fail → return last response with `X-Routiq-JSON-Valid: false` (fail-open)
+- Cache key includes `response_format` to avoid cross-contamination
+
+### Response Headers
+- `X-Routiq-JSON-Valid: true|false` — whether response is valid JSON
+- `X-Routiq-JSON-Retries: N` — how many retries were needed (0 = first attempt valid)
+
+### Dependencies
+- `cryptography>=42.0.0` — Fernet encryption for BYOK
+- `jsonschema>=4.21.0` — JSON schema validation for guardrails
 
 ## Git Profile
 - GitHub account: Abdulkalam98
@@ -285,14 +420,16 @@ curl -X POST https://routiq-api.onrender.com/v1/keys/create \
 - Landing page updated 2026-07-03 (removed India-specific copy, added token-saving feature cards)
 - Security features added 2026-07-03 (token budget per key, PII redaction, prompt injection detection)
 - Observability added 2026-07-06 (request logs page, time-range filtering, enhanced UsageLog, cache hit tracking)
+- BYOK + Output Guardrails added 2026-07-06 (provider keys CRUD, Fernet encryption, JSON mode with retry, provider-keys UI)
 - Navbar links: Docs → /docs, Pricing → #pricing, Playground → /playground, Dashboard → /dashboard
-- Sidebar nav order: Dashboard, Logs, Playground, API Keys, Billing
+- Sidebar nav order: Dashboard, Logs, Playground, API Keys, Provider Keys, Billing
 - No tests written yet — add pytest + jest when ready
 - Playground presets: Summarizer, Translator, Code Helper, Explainer, Grammar Fixer (frontend-only)
 - Docs page uses IntersectionObserver for scroll-aware sidebar highlighting
 
 ## Migrations
 - `backend/migrations/002_add_observability_columns.sql` — adds status, cache_type, completion_id, error_message, is_stream to usage_logs
+- `backend/migrations/003_byok_and_guardrails.sql` — creates user_provider_keys table (with RLS), adds key_source to usage_logs
 - Run migrations manually on Supabase SQL Editor (no auto-migration tool)
 
 ## UI Theme
@@ -307,14 +444,8 @@ curl -X POST https://routiq-api.onrender.com/v1/keys/create \
 
 ### Completed ✅
 - **Observability/Request Logs** — full request logs page, time-range filtering, cache hit tracking, paginated API
-
-### Week 2: BYOK + Output Guardrails
-- **BYOK (Bring Your Own Keys)** — users store their own OpenAI/Anthropic keys, Routiq adds caching + security + observability
-  - New table `user_provider_keys`, modify `get_provider()` to check user keys first
-  - Removes "why pay you?" objection: "Use YOUR keys, we add caching + security for free"
-- **Output Guardrails (JSON mode)** — `response_format: {type: "json_object", schema: {...}}`
-  - Retry loop: if response isn't valid JSON/schema, re-prompt up to 3x
-  - Every production app needs structured output
+- **BYOK (Bring Your Own Keys)** — users store their own OpenAI/Anthropic/Google/Mistral keys, encrypted with Fernet, provider-keys UI page
+- **Output Guardrails (JSON Mode)** — `response_format: {type: "json_object"|"json_schema"}`, auto-retry up to 3x, schema validation via jsonschema
 
 ### Week 3: Python SDK + npm Package
 - **Python SDK** — `pip install routiq` (thin wrapper over OpenAI SDK with `base_url` preset)
@@ -344,6 +475,6 @@ curl -X POST https://routiq-api.onrender.com/v1/keys/create \
 | PII redaction | ❌ | ❌ | ✅ |
 | Prompt injection guard | ❌ | ❌ | ✅ |
 | Request logs | ✅ | ✅ | ✅ |
-| BYOK | ✅ | ❌ | 🔜 Week 2 |
-| Output guardrails | ✅ | ✅ | 🔜 Week 2 |
+| BYOK | ✅ | ❌ | ✅ |
+| Output guardrails | ✅ | ✅ | ✅ |
 | SDKs | ✅ | ✅ | 🔜 Week 3 |

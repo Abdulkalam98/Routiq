@@ -3,12 +3,12 @@ import { useRouter } from 'next/router';
 
 export function getToken() {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('routiq_token');
+  return localStorage.getItem('inferix_token');
 }
 
 export function logout() {
   if (typeof window !== 'undefined') {
-    localStorage.removeItem('routiq_token');
+    localStorage.removeItem('inferix_token');
   }
 }
 

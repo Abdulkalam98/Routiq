@@ -45,7 +45,7 @@ export default function Billing() {
   return (
     <Layout>
       <Head>
-        <title>Billing - Routiq</title>
+        <title>Billing - Inferix</title>
       </Head>
 
       <div className="space-y-6">

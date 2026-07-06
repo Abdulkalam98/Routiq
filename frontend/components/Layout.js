@@ -119,9 +119,9 @@ function SidebarContent({ currentPath, onClose, isDark }) {
       <div className={`flex items-center justify-between h-16 px-6 border-b ${isDark ? 'border-dark-600' : 'border-gray-200'}`}>
         <Link href="/" className="flex items-center gap-2">
           <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">R</span>
+            <span className="text-white font-bold text-sm">I</span>
           </div>
-          <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Routiq</span>
+          <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Inferix</span>
         </Link>
         {onClose && (
           <button

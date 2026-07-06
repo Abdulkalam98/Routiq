@@ -145,7 +145,7 @@ export default function Logs() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `routiq-logs-${timeRange}.csv`;
+    a.download = `inferix-logs-${timeRange}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -156,7 +156,7 @@ export default function Logs() {
   return (
     <Layout>
       <Head>
-        <title>Request Logs - Routiq</title>
+        <title>Request Logs - Inferix</title>
       </Head>
 
       <div className="space-y-6">

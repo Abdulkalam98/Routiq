@@ -12,9 +12,9 @@ export default function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">R</span>
+              <span className="text-white font-bold text-sm">I</span>
             </div>
-            <span className="text-lg font-bold text-white">Routiq</span>
+            <span className="text-lg font-bold text-white">Inferix</span>
           </Link>
 
           {/* Desktop Navigation */}

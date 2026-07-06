@@ -39,7 +39,7 @@ export default function Signup() {
       const data = await res.json();
 
       if (res.ok) {
-        localStorage.setItem('routiq_token', data.access_token);
+        localStorage.setItem('inferix_token', data.access_token);
         router.push('/dashboard');
       } else {
         setError(data?.detail?.error?.message || 'Signup failed. Please try again.');
@@ -54,13 +54,13 @@ export default function Signup() {
   return (
     <>
       <Head>
-        <title>Sign Up - Routiq</title>
+        <title>Sign Up - Inferix</title>
       </Head>
       <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-dark-800 rounded-xl border border-dark-600 p-8">
           <div className="flex justify-center mb-6">
             <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">R</span>
+              <span className="text-white font-bold">I</span>
             </div>
           </div>
           <h1 className="text-2xl font-bold text-white text-center mb-2">Create your account</h1>

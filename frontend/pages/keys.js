@@ -116,7 +116,7 @@ export default function Keys() {
   return (
     <Layout>
       <Head>
-        <title>API Keys - Routiq</title>
+        <title>API Keys - Inferix</title>
       </Head>
 
       <div className="space-y-6">

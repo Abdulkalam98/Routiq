@@ -27,7 +27,7 @@ export default function Login() {
       const data = await res.json();
 
       if (res.ok) {
-        localStorage.setItem('routiq_token', data.access_token);
+        localStorage.setItem('inferix_token', data.access_token);
         router.push('/dashboard');
       } else {
         setError(data?.detail?.error?.message || 'Invalid email or password.');
@@ -42,17 +42,17 @@ export default function Login() {
   return (
     <>
       <Head>
-        <title>Login - Routiq</title>
+        <title>Login - Inferix</title>
       </Head>
       <div className="min-h-screen bg-dark-900 flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-dark-800 rounded-xl border border-dark-600 p-8">
           <div className="flex justify-center mb-6">
             <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">R</span>
+              <span className="text-white font-bold">I</span>
             </div>
           </div>
           <h1 className="text-2xl font-bold text-white text-center mb-2">Welcome back</h1>
-          <p className="text-sm text-gray-400 text-center mb-8">Sign in to your Routiq account</p>
+          <p className="text-sm text-gray-400 text-center mb-8">Sign in to your Inferix account</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

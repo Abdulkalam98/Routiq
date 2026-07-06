@@ -7,7 +7,7 @@ import { PaperAirplaneIcon, TrashIcon } from '@heroicons/react/24/outline';
 const API_BASE = '';
 
 const MODELS = [
-  { id: 'auto', name: 'Auto (Smart)', provider: 'Routiq' },
+  { id: 'auto', name: 'Auto (Smart)', provider: 'Inferix' },
   { id: 'gemini-flash', name: 'Gemini Flash', provider: 'Google' },
   { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI' },
   { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'OpenAI' },
@@ -123,7 +123,7 @@ export default function Playground() {
   return (
     <Layout>
       <Head>
-        <title>Playground - Routiq</title>
+        <title>Playground - Inferix</title>
       </Head>
 
       <div className="flex flex-col h-[calc(100vh-10rem)]">
